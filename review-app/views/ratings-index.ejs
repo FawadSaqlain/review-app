@@ -1,0 +1,128 @@
+<h1>Ratings</h1>
+<div>
+  <label>Offering: <select id="offeringSelect"><option value="">-- all offerings --</option>
+    <% offerings.forEach(function(o){ %>
+      <option value="<%= o._id %>"><%= o.course && o.course.title ? o.course.title : 'Course' %> by <%= o.teacher && o.teacher.name ? (o.teacher.name.first || o.teacher.name.last) : 'Teacher' %> <%= o.section ? ('(Section ' + o.section + ')') : '' %></option>
+    <% }) %>
+  </select></label>
+  <label>Min Marks: <input id="minMarks" type="number" min="0" /></label>
+  <label>Min Stars: <input id="minStars" type="number" min="1" max="5" /></label>
+  <label>Search: <input id="search" type="text" placeholder="student/comment" /></label>
+  <label>Sort: <select id="sort"><option value="createdAt">Newest</option><option value="overallRating">Stars</option><option value="obtainedMarks">Marks</option></select></label>
+  <button id="apply">Apply</button>
+</div>
+<div id="aggregates" style="margin-top:8px; font-weight:600;"></div>
+<table id="ratingsTable" border="1" cellpadding="6" style="width:100%; margin-top:12px;">
+  <thead>
+    <tr><th>Offering (Teacher — Course)</th><th>Overall (avg)</th><th>Marks (avg)</th><th>Comment summary</th><th>Actions</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+<div id="pager" style="margin-top:8px;"></div>
+<script>
+async function fetchRatings(q={}){
+  const params = new URLSearchParams(q);
+  const res = await fetch('/api/ratings?' + params.toString());
+  return res.json();
+}
+
+function rowForGroup(g){
+  const tr = document.createElement('tr');
+  const offeringLabel = g.label || 'Offering';
+  const avgOverall = g.count ? (g.sumOverall / g.count) : 0;
+  const avgMarks = g.count ? (g.sumMarks / g.count) : 0;
+  // short comment summary: up to 2 short snippets
+  const shortComments = (g.comments || []).slice(0,2).map(c => c.length > 120 ? c.slice(0,120) + '...' : c).join(' | ');
+  let actions = '';
+  if (g.userRatingId) actions = `<button class="edit" data-id="${g.userRatingId}">Edit</button>`;
+  tr.innerHTML = `<td>${offeringLabel}</td><td>${avgOverall.toFixed(2)}</td><td>${avgMarks.toFixed(2)}</td><td>${shortComments}</td><td>${actions}</td>`;
+  // attach a data-offering attribute so we can fetch full summary on demand
+  if (g.offeringId) tr.setAttribute('data-offering', g.offeringId);
+  return tr;
+}
+
+async function load(page=1){
+  const q = { page };
+  const off = document.getElementById('offeringSelect').value;
+  const minMarks = document.getElementById('minMarks').value;
+  const minStars = document.getElementById('minStars').value;
+  const search = document.getElementById('search').value;
+  const sort = document.getElementById('sort').value;
+  if (off) q.offering = off;
+  if (minMarks) q.minMarks = minMarks;
+  if (minStars) q.minStars = minStars;
+  if (search) q.search = search;
+  if (sort) q.sort = sort;
+  const json = await fetchRatings(q);
+  const tbody = document.querySelector('#ratingsTable tbody'); tbody.innerHTML='';
+  if (json && json.success){
+    // Group ratings by offering (teacher + course code) and show averages per offering
+    const groups = new Map();
+    // current user id (to detect if the user has a rating in this group)
+    let currentUserId = null;
+    try { const u = JSON.parse(localStorage.getItem('user') || 'null'); if (u && u._id) currentUserId = String(u._id); } catch(e){}
+    json.data.items.forEach(r => {
+      const off = r.offering && r.offering._id ? String(r.offering._id) : ('__' + (r._id||Math.random()));
+      if (!groups.has(off)) groups.set(off, { offeringId: r.offering && r.offering._id, label: '', count:0, sumOverall:0, sumMarks:0, comments:[], userRatingId: null });
+      const g = groups.get(off);
+      // build label: Teacher — CourseCode (fallback to course title)
+      if (!g.label) {
+        const teacher = (r.offering && r.offering.teacher && r.offering.teacher.name) ? ((r.offering.teacher.name.first||'') + ' ' + (r.offering.teacher.name.last||'')).trim() : '';
+        const code = (r.offering && r.offering.course && (r.offering.course.code || r.offering.course.title)) ? (r.offering.course.code || r.offering.course.title) : '';
+        g.label = (teacher ? teacher : 'Teacher') + ' — ' + (code || 'Course');
+      }
+      g.count += 1;
+      g.sumOverall += (Number(r.overallRating) || 0);
+      g.sumMarks += (Number(r.obtainedMarks) || 0);
+      if (r.comment) g.comments.push(r.comment);
+      if (currentUserId && r.student && String(r.student._id) === currentUserId) g.userRatingId = r._id;
+      groups.set(off, g);
+    });
+    // append grouped rows
+    groups.forEach(g => tbody.appendChild(rowForGroup(g)));
+    // pager
+    const pager = document.getElementById('pager'); pager.innerHTML = '';
+      const total = json.data.total; const limit = json.data.limit; const pages = Math.ceil(total/limit);
+  const agg = json.data.aggregates || { avgOverall:0, avgMarks:0, count:0 };
+  // As requested, do not display the 'Showing X offering(s)' line. Show only overall counts/averages.
+  document.getElementById('aggregates').textContent = `Ratings: ${agg.count}  Avg Stars: ${agg.avgOverall.toFixed(2)}  Avg Marks: ${agg.avgMarks.toFixed(2)}`;
+      // fetch summary for offering if specified
+      const offSelected = document.getElementById('offeringSelect').value;
+      if (offSelected) {
+        fetch('/api/ratings/summary?offering=' + offSelected).then(r=>r.json()).then(j=>{
+          if (j && j.success) {
+            // display summary below table (HTML, safely escaped)
+            let el = document.getElementById('summary');
+            if (!el) {
+              el = document.createElement('div');
+              el.id = 'summary';
+              el.style = 'margin-top:12px; background:#fafafa; padding:12px; border:1px solid #eee;';
+              document.querySelector('table').after(el);
+            }
+            // safe escape function to avoid XSS
+            const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;" })[c]);
+            const summaryHtml = esc(j.data.summary).replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+            const averagesHtml = `<div style="margin-top:8px; color:#333; font-weight:600;">Averages: Stars ${Number(j.data.avgOverall||0).toFixed(2)}, Marks ${Number(j.data.avgMarks||0).toFixed(2)}</div>`;
+            el.innerHTML = `<div style="font-size:14px; color:#222;"><strong>Summary</strong><div style="margin-top:6px;">${summaryHtml}</div>${averagesHtml}</div>`;
+          }
+        }).catch(()=>{});
+      } else {
+        const existing = document.getElementById('summary'); if (existing) existing.remove();
+      }
+    for (let i=1;i<=pages;i++){
+      const btn = document.createElement('button'); btn.textContent = i; btn.addEventListener('click', ()=> load(i)); pager.appendChild(btn);
+    }
+    // attach edit handlers: navigate to the prefilled edit page
+    document.querySelectorAll('button.edit').forEach(btn => btn.addEventListener('click', (e) => {
+      const id = e.target.dataset.id;
+      if (!id) return;
+      // go to server-rendered edit form
+      window.location.href = '/ratings/' + id + '/edit';
+    }));
+  }
+}
+
+document.getElementById('apply').addEventListener('click', ()=> load(1));
+// initial load
+load();
+</script>

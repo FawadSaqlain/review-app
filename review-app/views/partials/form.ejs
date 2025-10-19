@@ -1,0 +1,9 @@
+<form class="apiForm" action="<%= action %>" method="post">
+  <% fields.forEach(function(f){ %>
+    <div class="form-row">
+      <label for="<%= f.name %>"><%= f.placeholder %></label>
+      <input id="<%= f.name %>" name="<%= f.name %>" type="<%= f.type %>" placeholder="<%= f.placeholder || '' %>" required />
+    </div>
+  <% }) %>
+  <div class="form-row"><button type="submit" class="primary"><%= submitText %></button></div>
+</form>

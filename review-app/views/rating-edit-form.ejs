@@ -1,0 +1,91 @@
+<h1>Edit Rating</h1>
+<form id="editRatingForm" method="post" action="/ratings/<%= rating._id %>?_method=PUT">
+  <input type="hidden" name="offering" value="<%= rating.offering %>" />
+  <div>
+    <label>Overall (1-5) <span style="color:crimson">*</span></label>
+    <div class="star-picker" data-value="<%= rating.overallRating %>">
+      <span class="star" data-value="1">☆</span>
+      <span class="star" data-value="2">☆</span>
+      <span class="star" data-value="3">☆</span>
+      <span class="star" data-value="4">☆</span>
+      <span class="star" data-value="5">☆</span>
+    </div>
+    <input type="hidden" name="overallRating" value="<%= rating.overallRating %>" required />
+  </div>
+  <div>
+    <label>Obtained Marks</label>
+    <input type="number" name="obtainedMarks" step="0.01" min="0" value="<%= typeof rating.obtainedMarks !== 'undefined' ? rating.obtainedMarks : '' %>" required />
+  </div>
+  <% questions.forEach(function(q){ %>
+    <div>
+      <label><%= q.text %></label>
+      <% var existingAnswer = (rating.answers || []).find(a=> String(a.question) === String(q._id)); %>
+      <% if (q.type === 'numeric') { %>
+        <input name="answers[]" data-qid="<%= q._id %>" data-type="numeric" value="<%= existingAnswer ? existingAnswer.value : '' %>" />
+      <% } else { %>
+        <textarea name="answers[]" data-qid="<%= q._id %>" data-type="text"><%= existingAnswer ? existingAnswer.value : '' %></textarea>
+      <% } %>
+    </div>
+  <% }) %>
+  <div>
+    <label>Comment (optional)</label>
+    <textarea name="comment"><%= rating.comment || '' %></textarea>
+  </div>
+  <div>
+    <label><input type="checkbox" name="anonymized" <%= rating.anonymized ? 'checked' : '' %> /> Submit anonymously</label>
+  </div>
+  <div>
+    <button type="submit">Save changes</button>
+  </div>
+</form>
+<style>
+  .star-picker { font-size: 28px; cursor: pointer; user-select: none; }
+  .star-picker .star.filled { color: gold; }
+</style>
+<script>
+  (function(){
+    const picker = document.querySelector('.star-picker');
+    if (!picker) return;
+    const stars = Array.from(picker.querySelectorAll('.star'));
+    const hidden = document.querySelector('input[name="overallRating"]');
+    const setValue = (v) => {
+      hidden.value = v;
+      stars.forEach(s => {
+        if (parseInt(s.dataset.value,10) <= v) s.classList.add('filled'); else s.classList.remove('filled');
+      });
+    };
+    const init = parseInt(picker.dataset.value || hidden.value || 0, 10) || 0;
+    if (init) setValue(init);
+    stars.forEach(s => {
+      s.addEventListener('mouseenter', () => {
+        const v = parseInt(s.dataset.value,10);
+        stars.forEach(st => { if (parseInt(st.dataset.value,10) <= v) st.classList.add('filled'); else st.classList.remove('filled'); });
+      });
+      s.addEventListener('mouseleave', () => { setValue(parseInt(hidden.value || 0,10)); });
+      s.addEventListener('click', () => { setValue(parseInt(s.dataset.value,10)); });
+    });
+  })();
+
+// handle form submit via fetch to send JSON and include auth token
+document.getElementById('editRatingForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const form = e.target;
+  const id = '<%= rating._id %>';
+  const offering = form.querySelector('input[name="offering"]').value;
+  const overallRating = parseInt(form.querySelector('input[name="overallRating"]').value,10);
+  const obtainedMarks = form.querySelector('input[name="obtainedMarks"]').value;
+  const answerEls = Array.from(form.querySelectorAll('[data-qid]'));
+  const answers = answerEls.map(el => ({ question: el.dataset.qid, type: el.dataset.type, value: el.value })).filter(a => a.value !== undefined && a.value !== null && String(a.value).trim() !== '');
+  const comment = form.querySelector('textarea[name="comment"]').value;
+  const anonymized = form.querySelector('input[name="anonymized"]').checked;
+  try {
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch('/ratings/' + id, { method: 'PUT', headers, body: JSON.stringify({ offering, answers, comment, anonymized, overallRating, obtainedMarks }) });
+    const json = await res.json();
+    if (json && json.success) { alert('Updated'); window.location = '/dashboard/ratings'; }
+    else { alert('Error: ' + (json && json.error && json.error.message ? json.error.message : 'unknown')); }
+  } catch (err) { alert('Network error: ' + err.message); }
+});
+</script>

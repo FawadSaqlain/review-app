@@ -1,0 +1,36 @@
+<%- include('partials/form', { action: '/api/auth/login', fields: [
+  { name: 'email', type: 'email', placeholder: 'Email' },
+  { name: 'password', type: 'password', placeholder: 'Password' }
+], submitText: 'Login' }) %>
+
+<div class="links">
+  <a href="/forgot-password">Forgot password?</a>
+  <a href="/signup">Create account</a>
+</div>
+
+<script>
+const form = document.querySelector('form');
+if (form) {
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    const fd = new FormData(form);
+    const body = Object.fromEntries(fd.entries());
+    try {
+  const r = await fetch(form.action, { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' });
+      const json = await r.json();
+      if (r.ok && json && json.success) {
+        // store token
+        if (json.data && json.data.token) localStorage.setItem('token', json.data.token);
+        // do not force redirect to complete-profile on first login; send user to home instead.
+        // If you want to require profile completion, handle that server-side or show an in-app notice here.
+        window.location = '/';
+        return;
+      }
+      alert((json && json.error && json.error.message) || 'Login failed');
+    } catch (err) {
+      console.error('login error', err);
+      alert('Network error');
+    }
+  });
+}
+</script>

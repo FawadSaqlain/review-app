@@ -1,0 +1,50 @@
+<% var message = typeof message !== 'undefined' ? message : '' %>
+<%- include('partials/form', { action: '/api/auth/signup', fields: [
+  { name: 'email', type: 'email', placeholder: 'student@cucms.edu.pk' },
+  { name: 'password', type: 'password', placeholder: 'Password' },
+  { name: 'name', type: 'text', placeholder: 'Full Name' }
+], submitText: 'Sign Up' }) %>
+
+<div id="response" class="response"><%= message %></div>
+
+<script>
+// intercept the form to handle redirect to OTP page
+const form = document.querySelector('form');
+if (form) {
+  const submitBtn = form.querySelector('button[type="submit"]') || document.createElement('button');
+  form.addEventListener('submit', async function(e){
+    // prevent the document-level submit listener from also handling this event
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const resp = document.getElementById('response');
+    try {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating...';
+      const fd = new FormData(form);
+      const body = Object.fromEntries(fd.entries());
+  const r = await fetch(form.action, { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' });
+      const json = await r.json();
+      if (r.ok && json && json.success) {
+        const email = encodeURIComponent(json.data.email || body.email);
+        // if server returned an OTP for development, show it so user can verify
+        if (json.data && json.data.otpForDev) {
+          resp.textContent = `OTP for development: ${json.data.otpForDev}`;
+          // still redirect to verify page so user can enter OTP
+        }
+        window.location = '/verify-signup?email=' + email;
+        return;
+      }
+      // handle non-OK status codes
+      if (json && json.error && json.error.message) resp.textContent = json.error.message;
+      else if (!r.ok) resp.textContent = `Server error (${r.status})`;
+      else resp.textContent = 'Server error';
+    } catch (err) {
+      console.error('signup fetch error', err);
+      document.getElementById('response').textContent = 'Network error';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sign Up';
+    }
+  });
+}
+</script>

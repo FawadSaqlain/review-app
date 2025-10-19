@@ -1,0 +1,145 @@
+<h1>Admin — Add Class Manually</h1>
+<form id="addClassForm" method="post" action="/admin/class/add">
+  <!-- <div>
+    <label for="code">Course Code</label>
+    <input id="code" name="code" required />
+  </div> -->
+  <div>
+    <label for="department">Department</label>
+    <select id="department" name="department" required>
+      <option value="">-- Select Department --</option>
+    </select>
+  </div>
+  <div>
+    <label for="program">Program / Degree</label>
+    <select id="program" name="program" required>
+      <option value="">-- Select Program --</option>
+    </select>
+  </div>
+  <div>
+    <label for="semesterNumber">Semester Number</label>
+    <input id="semesterNumber" name="semesterNumber" type="number" min="1" max="12" required />
+  </div>
+  <div>
+    <label for="section">Section (optional)</label>
+    <input id="section" name="section" />
+  </div>
+
+  <h3>Subjects</h3>
+  <div id="subjectsContainer">
+    <!-- dynamic rows inserted here -->
+  </div>
+  <div>
+    <button id="addRowBtn" type="button">Add subject</button>
+  </div>
+  <div>
+    <button type="submit">Add Class(es)</button>
+  </div>
+</form>
+
+<script>
+// Mapping provided by admin (hard-coded here for now)
+const deptPrograms = {
+  "Computer Science": [
+    "Bachelor of Science in Computer Science: BS (CS)",
+    "Bachelor of Software Engineering"
+  ],
+  "Environmental Sciences": [
+    "BS in Environmental Sciences",
+    "BS in Agriculture"
+  ],
+  "Management Sciences": [
+    "Bachelor of Science in Business Administration BS(BA)",
+    "Bachelor of Science in Accounting and Finance"
+  ],
+  "Humanities": [
+    "Bachelor of Science in English BS(ENG)"
+  ],
+  "Mathematics": [
+    "Bachelor of Science in Mathematics with Data Science",
+    "Bachelor of Science in Mathematics"
+  ],
+  "Economics": [
+    "Bachelor of Science in Economics with Data Science",
+    "Bachelor of Science in Economics: BS (Eco)"
+  ],
+  "Biotechnology": [
+    "BS in Biotechnology"
+  ]
+};
+
+// populate department select
+const deptSelect = document.getElementById('department');
+const programSelect = document.getElementById('program');
+Object.keys(deptPrograms).forEach(d => {
+  const opt = document.createElement('option'); opt.value = d; opt.textContent = d; deptSelect.appendChild(opt);
+});
+
+deptSelect.addEventListener('change', function () {
+  const val = this.value;
+  // clear programs
+  programSelect.innerHTML = '<option value="">-- Select Program --</option>';
+  if (!val) return;
+  const progs = deptPrograms[val] || [];
+  progs.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; programSelect.appendChild(o); });
+});
+// dynamic subject rows
+const subjectsContainer = document.getElementById('subjectsContainer');
+function addSubjectRow(subject = {}) {
+  const idx = subjectsContainer.children.length;
+  const row = document.createElement('div');
+  row.className = 'subject-row';
+  row.innerHTML = `
+    <input name="sub_code" placeholder="Course Code" data-idx="${idx}" value="${subject.code || ''}" required />
+    <input name="sub_title" placeholder="Course Title" data-idx="${idx}" value="${subject.title || ''}" />
+    <input name="sub_teacher" placeholder="Teacher Name" data-idx="${idx}" value="${subject.teacherName || ''}" required />
+    <button type="button" class="remove-row">Remove</button>
+  `;
+  subjectsContainer.appendChild(row);
+
+  row.querySelector('.remove-row').addEventListener('click', function () { row.remove(); });
+}
+
+// start with one row
+addSubjectRow();
+
+document.getElementById('addRowBtn').addEventListener('click', function () { addSubjectRow(); });
+
+document.getElementById('addClassForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const form = e.target;
+  // collect form-level fields
+  const dept = document.getElementById('department').value;
+  const program = document.getElementById('program').value;
+  const semesterNumber = document.getElementById('semesterNumber').value;
+  const section = document.getElementById('section').value;
+
+  // collect subject rows
+  const rows = Array.from(document.querySelectorAll('.subject-row'));
+  const subjects = rows.map(r => ({
+    code: r.querySelector('input[name="sub_code"]').value,
+    title: r.querySelector('input[name="sub_title"]').value,
+    teacherName: r.querySelector('input[name="sub_teacher"]').value
+  }));
+
+  const payload = { department: dept, program, semesterNumber, section, subjects };
+
+  try {
+    // include admin token from localStorage
+    const token = localStorage.getItem('adminToken');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(form.action, { method: 'POST', headers, body: JSON.stringify(payload) });
+    const json = await res.json();
+    if (json && json.success) {
+      alert('Classes added');
+      form.reset();
+      subjectsContainer.innerHTML = ''; addSubjectRow();
+    } else {
+      alert('Error: ' + (json && json.error && json.error.message ? json.error.message : 'unknown'));
+    }
+  } catch (err) {
+    alert('Network error: ' + err.message);
+  }
+});
+</script>

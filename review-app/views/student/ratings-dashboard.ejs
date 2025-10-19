@@ -1,0 +1,47 @@
+<h1>My Ratings</h1>
+<script>window.CURRENT_USER_ID = "<%= typeof currentUserId !== 'undefined' && currentUserId ? currentUserId : '' %>";</script>
+<div>
+  <label>Search: <input id="search" type="text" placeholder="comment or course/teacher" /></label>
+  <button id="apply">Apply</button>
+</div>
+<div id="results">
+  <table id="ratingsTable" border="1" cellpadding="4">
+    <thead><tr><th>ID</th><th>Overall</th><th>Marks</th><th>Comment</th><th>Submitted</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<script>
+async function fetchRatings(q={}){
+  const params = new URLSearchParams(q);
+  const res = await fetch('/api/ratings?' + params.toString());
+  const json = await res.json();
+  return json;
+}
+
+function renderRow(r){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${r._id}</td><td>${r.overallRating}</td><td>${r.obtainedMarks}</td><td>${r.comment||''}</td><td>${new Date(r.createdAt).toLocaleString()}</td><td><button data-id="${r._id}" class="edit">Edit</button></td>`;
+  return tr;
+}
+
+document.getElementById('apply').addEventListener('click', async ()=>{
+  const q = {};
+  const search = document.getElementById('search').value;
+  if (search) q.search = search;
+  // limit to current user via student param if available in page global 'CURRENT_USER_ID'
+  if (window.CURRENT_USER_ID) q.student = window.CURRENT_USER_ID;
+  const json = await fetchRatings(q);
+  const tbody = document.querySelector('#ratingsTable tbody'); tbody.innerHTML='';
+  if (json && json.success){
+    json.data.items.forEach(r=> tbody.appendChild(renderRow(r)));
+    tbody.querySelectorAll('.edit').forEach(btn=> btn.addEventListener('click', (e)=>{
+      const id = e.target.dataset.id;
+      if (!id) return;
+      window.location.href = '/ratings/' + id + '/edit';
+    }));
+  }
+});
+
+// auto-load
+document.getElementById('apply').click();
+</script>

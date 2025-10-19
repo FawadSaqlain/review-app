@@ -1,0 +1,19 @@
+<div class="profile-grid">
+	<h2>My Profile</h2>
+	<p><strong>Email:</strong> <%= user.email %></p>
+<p><strong>Name:</strong> <%= user.name && user.name.first ? user.name.first : '' %> <%= user.name && user.name.last ? user.name.last : '' %></p>
+<p><strong>Degree:</strong> <%= user.degreeShort || '' %></p>
+<p><strong>Intake:</strong> <%= user.intake ? (user.intake.season + user.intake.year) : '' %></p>
+<p><strong>Semester:</strong> <%= user.semesterNumber || '' %></p>
+<p><strong>Section:</strong> <%= user.section || '' %></p>
+<p><strong>CGPA:</strong> <%= user.cgpa || '' %></p>
+<p><strong>Phone:</strong> <%= user.phone || '' %></p>
+
+<% if (user.idCardImage) { %>
+  <div class="form-row">
+    <strong>University ID:</strong>
+    <div><img class="img-preview" src="<%= user.idCardImage %>" alt="University ID"/></div>
+  </div>
+<% } %>
+
+<a href="/">Home</a>

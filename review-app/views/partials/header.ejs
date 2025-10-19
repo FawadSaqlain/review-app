@@ -1,0 +1,159 @@
+<header class="site-header">
+  <div class="brand">
+    <a href="/" class="brand-link">
+      <span class="brand-logo"><i class="fa-solid fa-building-columns"></i></span>
+      <span class="brand-title">COMSATS Review</span>
+    </a>
+  </div>
+  <nav class="site-nav">
+    <a href="/">Home</a>
+  <a id="signupLink" href="/signup">Sign Up</a>
+  <a id="loginLink" href="/login">Login</a>
+  <!-- Admin link is conditional: defaults to login page; client script will switch to add page when authenticated -->
+  <a id="adminLink" href="/admin/login">Admin</a>
+  <a id="adminUsersLink" href="/admin/users" style="display:none; margin-left:10px;">Manage Users</a>
+  <a id="userLink" href="/profile" style="display:none; margin-left:10px;">My Profile</a>
+  <a id="giveReviewLink" href="/ratings/give" style="display:none; margin-left:10px;">Give Review</a>
+  <a id="viewRatingsLink" href="/ratings" style="display:none; margin-left:10px;">View Ratings</a>
+  <a id="myReviewsLink" href="/dashboard/ratings" style="display:none; margin-left:10px;">My Reviews</a>
+  <span id="userDisplay" style="display:none; margin-left:10px; font-weight:600;"></span>
+  <a id="commonLogout" href="#" style="display:none; margin-left:10px;" title="Logout">Logout</a>
+  <a id="adminLogout" href="#" style="display:none; margin-left:10px;" title="Admin Logout">Admin Logout</a>
+  </nav>
+
+  <!-- Profile completion banner (hidden by default) -->
+  <div id="profileCompleteBanner" style="display:none; background:#fff3cd; color:#856404; padding:8px 12px; border:1px solid #ffeeba; margin-top:8px;">
+    Your profile is incomplete. <a href="/complete-profile" id="completeProfileLink">Click here to complete your profile</a>.
+  </div>
+
+  <script>
+    (function(){
+      try {
+        const adminLink = document.getElementById('adminLink');
+        const logoutBtn = document.getElementById('commonLogout');
+        const loginLink = document.getElementById('loginLink');
+        const signupLink = document.getElementById('signupLink');
+        const userLink = document.getElementById('userLink');
+
+        const adminToken = localStorage.getItem('adminToken');
+        const userToken = localStorage.getItem('token');
+
+        // Admin handling
+        const adminUsersLink = document.getElementById('adminUsersLink');
+        const adminLogout = document.getElementById('adminLogout');
+        if (adminToken) {
+          adminLink.href = '/admin/class/add';
+          adminLink.textContent = 'Admin • Dashboard';
+          adminUsersLink.style.display = 'inline-block';
+          adminLogout.style.display = 'inline-block';
+          // show ratings view to admins
+          document.getElementById('viewRatingsLink').style.display = 'inline-block';
+        } else {
+          adminLink.href = '/admin/login';
+          adminLink.textContent = 'Admin';
+          adminUsersLink.style.display = 'none';
+          adminLogout.style.display = 'none';
+        }
+
+        // User handling
+        const userDisplay = document.getElementById('userDisplay');
+        let userObj = null;
+        try { userObj = JSON.parse(localStorage.getItem('user') || 'null'); } catch (e) { userObj = null; }
+
+        if (userToken) {
+          loginLink.style.display = 'none';
+          signupLink.style.display = 'none';
+          userLink.style.display = 'inline-block';
+          const giveReviewLink = document.getElementById('giveReviewLink');
+          giveReviewLink.style.display = 'inline-block';
+          // show ratings list link to regular users
+          document.getElementById('viewRatingsLink').style.display = 'inline-block';
+          // show my reviews link for logged-in students
+          document.getElementById('myReviewsLink').style.display = 'inline-block';
+          logoutBtn.style.display = 'inline-block';
+          if (userObj && (userObj.name || userObj.email)) {
+            userDisplay.style.display = 'inline-block';
+            userDisplay.textContent = (userObj.name && userObj.name.first ? userObj.name.first : userObj.email);
+          }
+          // show profile-complete banner when required fields are missing
+          (async function checkProfileComplete(){
+            try {
+              let u = userObj;
+                  // if we don't have a user object or it's missing any core fields, try fetching /api/auth/me
+                  // Note: server stores uploaded ID under `idCardImage` so include that field in checks
+                  const needsFetch = !u || (
+                    // missing phone OR missing any known idCard fields OR missing cgpa when semesterNumber > 1
+                    !u.phone || (!u.idCard && !u.idCardFilename && !u.idCardUrl && !u.idCardImage) ||
+                    (u.semesterNumber && Number(u.semesterNumber) > 1 && (typeof u.cgpa === 'undefined' || u.cgpa === null || String(u.cgpa).trim() === ''))
+                  );
+              if (needsFetch) {
+                try {
+                  const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+                  const j = await res.json().catch(()=>null);
+                  if (j && j.success && j.data && j.data.user) {
+                    u = j.data.user;
+                    try { localStorage.setItem('user', JSON.stringify(u)); } catch(e){}
+                  }
+                } catch(e) { /* ignore */ }
+              }
+              if (!u) return;
+              const showBanner = (() => {
+                // missing phone
+                if (!u.phone) return true;
+                // missing idCard (server stores file path on user.idCardImage; older names may be idCard/idCardFilename/idCardUrl)
+                if (!u.idCard && !u.idCardFilename && !u.idCardUrl && !u.idCardImage) return true;
+                // if semesterNumber > 1 then cgpa required
+                if (u.semesterNumber && Number(u.semesterNumber) > 1) {
+                  if (typeof u.cgpa === 'undefined' || u.cgpa === null || String(u.cgpa).trim() === '') return true;
+                }
+                return false;
+              })();
+              if (showBanner) {
+                const b = document.getElementById('profileCompleteBanner');
+                if (b) b.style.display = 'block';
+              }
+            } catch (e) { /* ignore */ }
+          })();
+        } else {
+          loginLink.style.display = 'inline-block';
+          signupLink.style.display = 'inline-block';
+          userLink.style.display = 'none';
+          const giveReviewLink = document.getElementById('giveReviewLink');
+          giveReviewLink.style.display = 'none';
+          userDisplay.style.display = 'none';
+          // if no admin and no user token, hide logout
+          if (!adminToken) logoutBtn.style.display = 'none';
+        }
+
+        // logout behavior: use shared appAuth.logout if available
+        logoutBtn.addEventListener('click', async function(e){
+          e.preventDefault();
+          if (window.appAuth && typeof window.appAuth.logout === 'function') {
+            window.appAuth.logout();
+            return;
+          }
+          try {
+            const token = userToken || adminToken;
+            if (token) {
+              await fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+            }
+          } catch (err) { /* ignore */ }
+          localStorage.removeItem('token');
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('user');
+          window.location = '/login';
+        });
+        // admin logout (separate button) - calls same helper
+        adminLogout.addEventListener('click', function(e){
+          e.preventDefault();
+          if (window.appAuth && typeof window.appAuth.logout === 'function') {
+            window.appAuth.logout();
+          } else {
+            // fallback
+            logoutBtn.click();
+          }
+        });
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
+</header>

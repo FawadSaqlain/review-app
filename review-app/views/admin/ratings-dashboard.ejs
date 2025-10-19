@@ -1,0 +1,51 @@
+<h1>Ratings Dashboard (Admin)</h1>
+<div>
+  <label>Min Marks: <input id="minMarks" type="number" min="0" /></label>
+  <label>Min Stars: <input id="minStars" type="number" min="1" max="5" /></label>
+  <label>Search: <input id="search" type="text" placeholder="student email/name or comment" /></label>
+  <label>Sort: <select id="sort"><option value="createdAt">Newest</option><option value="overallRating">Stars</option><option value="obtainedMarks">Marks</option></select></label>
+  <button id="apply">Apply</button>
+</div>
+<div id="results">
+  <table id="ratingsTable" border="1" cellpadding="4">
+    <thead><tr><th>ID</th><th>Student</th><th>Overall</th><th>Marks</th><th>Comment</th><th>Anon</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<script>
+async function fetchRatings(q={}){
+  const params = new URLSearchParams(q);
+  const res = await fetch('/api/ratings?' + params.toString());
+  const json = await res.json();
+  return json;
+}
+
+function renderRow(r){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${r._id}</td><td>${r.student ? (r.student.name && r.student.name.first ? r.student.name.first : r.student.email) : 'N/A'}</td><td>${r.overallRating}</td><td>${r.obtainedMarks}</td><td>${r.comment||''}</td><td>${r.anonymized}</td><td><button data-id="${r._id}" class="edit">Edit</button></td>`;
+  return tr;
+}
+
+document.getElementById('apply').addEventListener('click', async ()=>{
+  const q = {};
+  const minMarks = document.getElementById('minMarks').value;
+  const minStars = document.getElementById('minStars').value;
+  const search = document.getElementById('search').value;
+  const sort = document.getElementById('sort').value;
+  if (minMarks) q.minMarks = minMarks;
+  if (minStars) q.minStars = minStars;
+  if (search) q.search = search;
+  if (sort) q.sort = sort;
+  const json = await fetchRatings(q);
+  const tbody = document.querySelector('#ratingsTable tbody'); tbody.innerHTML='';
+  if (json && json.success){
+    json.data.items.forEach(r=> tbody.appendChild(renderRow(r)));
+    // attach edit handlers (navigate to edit form)
+    tbody.querySelectorAll('.edit').forEach(btn=> btn.addEventListener('click', (e)=>{
+      const id = e.target.dataset.id;
+      if (!id) return;
+      window.location.href = '/ratings/' + id + '/edit';
+    }));
+  }
+});
+</script>

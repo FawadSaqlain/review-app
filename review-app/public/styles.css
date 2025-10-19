@@ -1,0 +1,62 @@
+:root{
+	--bg:#f6f8fb;
+	--card:#ffffff;
+	--muted:#6b7280;
+	--primary:#0f62fe;
+	--accent:#7c3aed;
+	--success:#16a34a;
+	--danger:#ef4444;
+	--radius:10px;
+}
+*{box-sizing:border-box}
+body{
+	font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+	background:linear-gradient(180deg, #f8fafc 0%, var(--bg) 100%);
+	color:#0f172a;
+	margin:0;
+	-webkit-font-smoothing:antialiased;
+}
+.container{
+	max-width:1100px;
+	margin:28px auto;
+	background:var(--card);
+	padding:28px;
+	border-radius:var(--radius);
+	box-shadow:0 8px 30px rgba(2,6,23,0.08);
+}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.page-title{font-size:1.4rem;margin:0;color:#0b1220;font-weight:600}
+.site-header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;background:transparent}
+.brand-link{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.brand-logo{font-size:1.6rem;color:var(--primary)}
+.brand-title{font-weight:700;font-size:1.1rem}
+.site-nav a{margin-left:14px;color:var(--muted);text-decoration:none;font-weight:600}
+.site-nav a:hover{color:var(--primary)}
+
+.form-row{margin-bottom:14px}
+input[type=text], input[type=email], input[type=password], input[type=file], input[type=number], select, textarea{
+	width:100%;padding:12px 14px;border:1px solid #e6eef8;border-radius:8px;background:#fbfdff;color:#07132a;font-size:0.95rem
+}
+label{display:block;margin-bottom:6px;color:var(--muted);font-size:0.92rem}
+button{background:var(--primary);color:#fff;padding:10px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:600}
+button.secondary{background:#eef2ff;color:var(--primary)}
+.response{margin-top:12px;padding:10px;border-radius:8px;background:#f1f5f9;color:#0b1220}
+
+.links{margin-top:12px}
+pre{background:#f8fafc;padding:12px;border-radius:8px}
+
+.site-footer{margin-top:28px;padding:20px 0;color:var(--muted);font-size:0.9rem}
+.site-footer .footer-row{display:flex;justify-content:space-between;align-items:center}
+.small{max-width:1100px;margin:0 auto}
+
+/* responsive */
+@media (max-width:720px){
+	.container{margin:16px;padding:18px}
+	.site-nav{display:none}
+	.page-title{font-size:1.2rem}
+}
+
+/* utility */
+.muted{color:var(--muted)}
+.text-center{text-align:center}
+.img-preview{max-width:320px;border-radius:8px;border:1px solid #eef2ff}

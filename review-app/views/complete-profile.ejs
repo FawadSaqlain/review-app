@@ -1,0 +1,55 @@
+<h2>Complete your profile</h2>
+<% if (user) { %>
+  <p>Completing for: <strong><%= user.email %></strong></p>
+<% } %>
+<form id="completeForm" enctype="multipart/form-data">
+  <input type="hidden" name="email" id="email" value="<%= user ? user.email : '' %>" />
+  <div class="form-row">
+    <label for="section">Section</label>
+    <input type="text" name="section" id="section" value="<%= user && user.section ? user.section : '' %>" />
+  </div>
+  <div class="form-row">
+    <label for="phone">Phone</label>
+    <input type="text" name="phone" id="phone" value="<%= user && user.phone ? user.phone : '' %>" />
+  </div>
+  <div>
+    <% if (user && user.semesterNumber && user.semesterNumber > 1) { %>
+      <div class="form-row">
+        <label for="cgpa">CGPA</label>
+        <input type="number" step="0.01" name="cgpa" min="0" max="4" id="cgpa" value="<%= user && user.cgpa ? user.cgpa : '' %>" />
+      </div>
+    <% } else { %>
+      <!-- hide CGPA when semester <= 1 -->
+    <% } %>
+  </div>
+  <div class="form-row">
+    <label for="idCard">Upload University ID (image, max 1MB)</label>
+    <input type="file" name="idCard" id="idCard" accept="image/*" />
+  </div>
+  <div class="form-row">
+    <button type="submit" class="primary">Save</button>
+  </div>
+  <div id="msg" class="response"></div>
+</form>
+
+<script>
+document.getElementById('completeForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const form = document.getElementById('completeForm');
+  const fd = new FormData(form);
+  const btn = form.querySelector('button[type=submit]');
+  const prevText = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+  const res = await fetch('/api/auth/complete-profile', { method: 'POST', body: fd, credentials: 'same-origin' });
+    const json = await res.json();
+    document.getElementById('msg').textContent = json.success ? json.data.message : (json.error && json.error.message) || 'Error';
+    if (json.success) {
+      const email = form.querySelector('#email').value;
+      setTimeout(()=> location.href = '/profile?email=' + encodeURIComponent(email), 800);
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = prevText;
+  }
+});
+</script>

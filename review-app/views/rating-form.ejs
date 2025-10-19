@@ -1,0 +1,98 @@
+<h1>Rate Course</h1>
+<form id="ratingForm" method="post" action="/ratings">
+  <input type="hidden" name="offering" value="<%= offeringId %>" />
+  <div>
+    <label>Overall (1-5) <span style="color:crimson">*</span></label>
+    <div class="star-picker" data-value="<%= existing ? existing.overallRating : '' %>">
+      <span class="star" data-value="1">☆</span>
+      <span class="star" data-value="2">☆</span>
+      <span class="star" data-value="3">☆</span>
+      <span class="star" data-value="4">☆</span>
+      <span class="star" data-value="5">☆</span>
+    </div>
+    <input type="hidden" name="overallRating" value="<%= existing ? existing.overallRating : '' %>" required />
+  </div>
+  <div>
+    <label>Obtained Marks (0 or more)</label>
+    <input type="number" name="obtainedMarks" step="0.01" min="0" value="<%= existing && typeof existing.obtainedMarks !== 'undefined' ? existing.obtainedMarks : '' %>" required />
+  </div>
+  <% questions.forEach(function(q){ %>
+    <div>
+      <label><%= q.text %></label>
+      <% if (q.type === 'numeric') { %>
+        <input name="answers[]" data-qid="<%= q._id %>" data-type="numeric" placeholder="Numeric value" />
+      <% } else { %>
+        <textarea name="answers[]" data-qid="<%= q._id %>" data-type="text"></textarea>
+      <% } %>
+    </div>
+  <% }) %>
+  <div>
+    <label>Comment (optional)</label>
+    <textarea name="comment"><%= existing ? existing.comment : '' %></textarea>
+  </div>
+  <div>
+    <label><input type="checkbox" name="anonymized" <%= (existing ? (existing.anonymized ? 'checked' : '') : 'checked') %> /> Submit anonymously</label>
+  </div>
+  <div>
+    <button type="submit">Submit Rating</button>
+  </div>
+</form>
+<script>
+document.getElementById('ratingForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const form = e.target;
+  const offering = form.querySelector('input[name="offering"]').value;
+  const overallRating = form.querySelector('input[name="overallRating"]').value;
+  if (!overallRating) { alert('Please provide an overall rating (1-5)'); return; }
+  const obtainedMarksEl = form.querySelector('input[name="obtainedMarks"]');
+  const obtainedMarks = obtainedMarksEl && obtainedMarksEl.value ? parseFloat(obtainedMarksEl.value) : undefined;
+  // collect only filled answers
+  const answerEls = Array.from(form.querySelectorAll('[data-qid]'));
+  const answers = answerEls.map(el => ({ question: el.dataset.qid, type: el.dataset.type, value: el.value })).filter(a => a.value !== undefined && a.value !== null && String(a.value).trim() !== '');
+  const comment = form.querySelector('textarea[name="comment"]').value;
+  const anonymized = form.querySelector('input[name="anonymized"]') ? form.querySelector('input[name="anonymized"]').checked : false;
+  try {
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch('/ratings', { method: 'POST', headers, body: JSON.stringify({ offering, answers, comment, anonymized, overallRating: parseInt(overallRating,10), obtainedMarks }) });
+    const json = await res.json();
+    if (json && json.success) {
+      alert('Rating submitted');
+      // redirect to give-list as requested
+      window.location = '/ratings/give';
+    } else {
+      alert('Error: ' + (json && json.error && json.error.message ? json.error.message : 'unknown'));
+    }
+  } catch (err) { alert('Network error: ' + err.message); }
+});
+</script>
+<style>
+  .star-picker { font-size: 28px; cursor: pointer; user-select: none; }
+  .star-picker .star.filled { color: gold; }
+</style>
+<script>
+  (function(){
+    const picker = document.querySelector('.star-picker');
+    if (!picker) return;
+    const stars = Array.from(picker.querySelectorAll('.star'));
+    const hidden = document.querySelector('input[name="overallRating"]');
+    const setValue = (v) => {
+      hidden.value = v;
+      stars.forEach(s => {
+        if (parseInt(s.dataset.value,10) <= v) s.classList.add('filled'); else s.classList.remove('filled');
+      });
+    };
+    // initialize from data-value or hidden
+    const init = parseInt(picker.dataset.value || hidden.value || 0, 10) || 0;
+    if (init) setValue(init);
+    stars.forEach(s => {
+      s.addEventListener('mouseenter', () => {
+        const v = parseInt(s.dataset.value,10);
+        stars.forEach(st => { if (parseInt(st.dataset.value,10) <= v) st.classList.add('filled'); else st.classList.remove('filled'); });
+      });
+      s.addEventListener('mouseleave', () => { setValue(parseInt(hidden.value || 0,10)); });
+      s.addEventListener('click', () => { setValue(parseInt(s.dataset.value,10)); });
+    });
+  })();
+</script>

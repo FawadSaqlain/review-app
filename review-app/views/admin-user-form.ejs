@@ -1,0 +1,61 @@
+<h1><%= title %></h1>
+<form method="post" action="<%= user ? ('/admin/users/' + user._id + '/edit') : '/admin/users/new' %>">
+  <div>
+    <label>Email</label>
+    <input name="email" type="email" required value="<%= user ? user.email : '' %>" />
+  </div>
+  <div>
+    <label>First name</label>
+    <input name="firstName" value="<%= user && user.name ? user.name.first : '' %>" />
+  </div>
+  <div>
+    <label>Last name</label>
+    <input name="lastName" value="<%= user && user.name ? user.name.last : '' %>" />
+  </div>
+  <div>
+    <label>Degree short (e.g. bse)</label>
+    <input name="degreeShort" value="<%= user ? user.degreeShort || '' : '' %>" />
+  </div>
+  <div>
+    <label>Roll number (e.g. 031)</label>
+    <input name="rollNumber" value="<%= user ? user.rollNumber || '' : '' %>" />
+  </div>
+  <div>
+    <label>Intake season-year (optional, e.g. fa22)</label>
+    <input name="intake" placeholder="fa22 or sp22" value="<%= user && user.intake ? (user.intake.season + (user.intake.year ? String(user.intake.year).slice(-2) : '')) : '' %>" />
+  </div>
+  <div>
+    <label>Semester Number</label>
+    <input name="semesterNumber" type="number" min="1" max="12" value="<%= user ? (user.semesterNumber || '') : '' %>" />
+  </div>
+  <div>
+    <label>Section</label>
+    <input name="section" value="<%= user ? user.section || '' : '' %>" />
+  </div>
+  <div>
+    <label>CGPA</label>
+    <input name="cgpa" type="number" step="0.01" min="0" max="4" value="<%= user ? (user.cgpa || '') : '' %>" />
+  </div>
+  <div>
+    <label>Phone</label>
+    <input name="phone" value="<%= user ? user.phone || '' : '' %>" />
+  </div>
+  <div>
+    <label>Role</label>
+    <select name="role">
+      <option value="student" <%= user && user.role === 'student' ? 'selected' : '' %>>Student</option>
+      <option value="admin" <%= user && user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+    </select>
+  </div>
+  <div>
+    <label>Password (leave blank to keep)</label>
+    <input name="password" type="password" />
+  </div>
+  <div>
+    <label>Active</label>
+    <input name="isActive" type="checkbox" value="1" <%= user && user.isActive ? 'checked' : '' %> />
+  </div>
+  <div>
+    <button type="submit">Save</button>
+  </div>
+</form>

@@ -1,0 +1,38 @@
+<h1>Ratings</h1>
+<style>
+  .rating-stars { font-size: 18px; }
+  .rating-stars .filled { color: gold; }
+  .rating-stars .empty { color: #ccc; }
+</style>
+<ul>
+  <% ratings.forEach(function(r){ %>
+    <li>
+      <!-- Student identity hidden: ratings are anonymous -->
+      <strong>Overall:</strong>
+      <% if (r.overallRating) { %>
+        <span class="rating-stars">
+          <% for (var i=1;i<=5;i++) { %>
+            <span class="<%= i<=r.overallRating ? 'filled' : 'empty' %>">★</span>
+          <% } %>
+        </span>
+        (<%= r.overallRating %>)
+      <% } else { %>
+        N/A
+      <% } %>
+      <br />
+      <% if (typeof r.obtainedMarks !== 'undefined' && r.obtainedMarks !== null) { %>
+        <strong>Obtained Marks:</strong> <%= r.obtainedMarks %>
+        <br />
+      <% } %>
+  <strong>Answers:</strong>
+      <ul>
+        <% (r.answers || []).forEach(function(a){ %>
+          <li><%= a.type %>: <%= a.value %></li>
+        <% }) %>
+      </ul>
+      <strong>Comment:</strong> <%= r.comment %>
+      <br />
+      <em>Submitted: <%= new Date(r.createdAt).toLocaleString() %></em>
+    </li>
+  <% }) %>
+</ul>

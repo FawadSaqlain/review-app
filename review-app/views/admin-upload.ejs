@@ -1,0 +1,11 @@
+<form id="uploadForm" action="/api/admin/timetable/upload" method="post" enctype="multipart/form-data">
+  <div class="form-row">
+    <label for="file">Timetable PDF</label>
+    <input id="file" name="file" type="file" accept="application/pdf" required />
+  </div>
+  <div class="form-row">
+    <button type="submit">Upload Timetable</button>
+  </div>
+</form>
+
+<pre id="result"></pre>
