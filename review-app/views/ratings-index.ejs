@@ -14,7 +14,7 @@
 <div id="aggregates" style="margin-top:8px; font-weight:600;"></div>
 <table id="ratingsTable" border="1" cellpadding="6" style="width:100%; margin-top:12px;">
   <thead>
-    <tr><th>Offering (Teacher — Course)</th><th>Overall (avg)</th><th>Marks (avg)</th><th>Comment summary</th><th>Actions</th></tr>
+    <tr><th>Offering (Teacher — Course)</th><th>Overall (avg)</th><th>Marks (avg)</th><th>Comment summary</th></tr>
   </thead>
   <tbody></tbody>
 </table>
@@ -26,6 +26,9 @@ async function fetchRatings(q={}){
   return res.json();
 }
 
+// escape utility used in multiple places
+function esc(s){ return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;" })[c]); }
+
 function rowForGroup(g){
   const tr = document.createElement('tr');
   const offeringLabel = g.label || 'Offering';
@@ -33,9 +36,8 @@ function rowForGroup(g){
   const avgMarks = g.count ? (g.sumMarks / g.count) : 0;
   // short comment summary: up to 2 short snippets
   const shortComments = (g.comments || []).slice(0,2).map(c => c.length > 120 ? c.slice(0,120) + '...' : c).join(' | ');
-  let actions = '';
-  if (g.userRatingId) actions = `<button class="edit" data-id="${g.userRatingId}">Edit</button>`;
-  tr.innerHTML = `<td>${offeringLabel}</td><td>${avgOverall.toFixed(2)}</td><td>${avgMarks.toFixed(2)}</td><td>${shortComments}</td><td>${actions}</td>`;
+  // actions column intentionally removed; keep table to 4 columns
+  tr.innerHTML = `<td>${offeringLabel}</td><td>${avgOverall.toFixed(2)}</td><td>${avgMarks.toFixed(2)}</td><td>${shortComments}</td>`;
   // attach a data-offering attribute so we can fetch full summary on demand
   if (g.offeringId) tr.setAttribute('data-offering', g.offeringId);
   return tr;
@@ -80,49 +82,59 @@ async function load(page=1){
     });
     // append grouped rows
     groups.forEach(g => tbody.appendChild(rowForGroup(g)));
+
+    // For each displayed offering row, fetch the per-offering summary and insert into the 'Comment summary' column
+    // This replaces the short snippets with the summarized comments for that specific offering.
+    (async () => {
+      const rows = Array.from(tbody.querySelectorAll('tr[data-offering]'));
+      await Promise.all(rows.map(async (tr) => {
+        const offId = tr.getAttribute('data-offering');
+        if (!offId) return;
+        try {
+          const r = await fetch('/api/ratings/summary?offering=' + encodeURIComponent(offId));
+          const j = await r.json().catch(()=>null);
+          if (j && j.success && j.data && typeof j.data.summary !== 'undefined') {
+            const td = tr.children[3]; // 4th column: Comment summary
+            const summaryHtml = esc(j.data.summary).replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+            td.innerHTML = summaryHtml;
+          }
+        } catch (e) {
+          // leave short comments if fetch fails
+          console.error('Failed to fetch offering summary for', offId, e);
+        }
+      }));
+    })();
     // pager
     const pager = document.getElementById('pager'); pager.innerHTML = '';
       const total = json.data.total; const limit = json.data.limit; const pages = Math.ceil(total/limit);
   const agg = json.data.aggregates || { avgOverall:0, avgMarks:0, count:0 };
   // As requested, do not display the 'Showing X offering(s)' line. Show only overall counts/averages.
   document.getElementById('aggregates').textContent = `Ratings: ${agg.count}  Avg Stars: ${agg.avgOverall.toFixed(2)}  Avg Marks: ${agg.avgMarks.toFixed(2)}`;
-      // fetch summary for offering if specified
-      const offSelected = document.getElementById('offeringSelect').value;
-      if (offSelected) {
-        fetch('/api/ratings/summary?offering=' + offSelected).then(r=>r.json()).then(j=>{
-          if (j && j.success) {
-            // display summary below table (HTML, safely escaped)
-            let el = document.getElementById('summary');
-            if (!el) {
-              el = document.createElement('div');
-              el.id = 'summary';
-              el.style = 'margin-top:12px; background:#fafafa; padding:12px; border:1px solid #eee;';
-              document.querySelector('table').after(el);
-            }
-            // safe escape function to avoid XSS
-            const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;" })[c]);
-            const summaryHtml = esc(j.data.summary).replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
-            const averagesHtml = `<div style="margin-top:8px; color:#333; font-weight:600;">Averages: Stars ${Number(j.data.avgOverall||0).toFixed(2)}, Marks ${Number(j.data.avgMarks||0).toFixed(2)}</div>`;
-            el.innerHTML = `<div style="font-size:14px; color:#222;"><strong>Summary</strong><div style="margin-top:6px;">${summaryHtml}</div>${averagesHtml}</div>`;
-          }
-        }).catch(()=>{});
-      } else {
-        const existing = document.getElementById('summary'); if (existing) existing.remove();
-      }
+      // (Removed: previously fetched and injected a full summary block under the table)
     for (let i=1;i<=pages;i++){
       const btn = document.createElement('button'); btn.textContent = i; btn.addEventListener('click', ()=> load(i)); pager.appendChild(btn);
     }
-    // attach edit handlers: navigate to the prefilled edit page
-    document.querySelectorAll('button.edit').forEach(btn => btn.addEventListener('click', (e) => {
-      const id = e.target.dataset.id;
-      if (!id) return;
-      // go to server-rendered edit form
-      window.location.href = '/ratings/' + id + '/edit';
-    }));
+    // (Removed: client-side edit-button handler. Edit buttons remain in the DOM but will use default behavior or server-rendered links.)
   }
 }
 
 document.getElementById('apply').addEventListener('click', ()=> load(1));
+// initial load: if no offering selected and there are offerings, auto-select the first real option
+const offeringSelectEl = document.getElementById('offeringSelect');
+try {
+  if (offeringSelectEl && offeringSelectEl.value === '' && offeringSelectEl.options.length > 1) {
+    // select the first non-empty option
+    for (let i = 0; i < offeringSelectEl.options.length; i++) {
+      if (offeringSelectEl.options[i].value && offeringSelectEl.options[i].value !== '') {
+        offeringSelectEl.selectedIndex = i;
+        console.log('Auto-selected offering', offeringSelectEl.options[i].value);
+        break;
+      }
+    }
+  }
+} catch (e) { console.warn('offering select auto-select failed', e); }
 // initial load
 load();
+// fetch summary when offering selection changes (immediate feedback)
+document.getElementById('offeringSelect').addEventListener('change', ()=> load(1));
 </script>

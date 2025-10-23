@@ -21,6 +21,16 @@ app.set('port', port);
 
 var server = http.createServer(app);
 
+// Global handlers to log unexpected errors to the terminal for easier debugging
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err && err.stack ? err.stack : err);
+  // optional: exit process if you prefer
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason && reason.stack ? reason.stack : reason);
+});
+
 /**
  * Listen on provided port, on all network interfaces.
  */
@@ -87,4 +97,5 @@ function onListening() {
     ? 'pipe ' + addr
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
+  console.log('Server is listening on', bind);
 }

@@ -108,7 +108,8 @@ exports.signup = async (req, res) => {
     try {
       const subject = 'COMSATS Vehari - Account Verification OTP';
       const text = `Your verification code is: ${otp}. It expires in 15 minutes.`;
-      await emailUtil.send({ to: normalizedEmail, subject, text });
+      console.log('sending signup email to', normalizedEmail,'with OTP', otp);
+      // await emailUtil.send({ to: normalizedEmail, subject, text });
     } catch (sendErr) {
       console.warn('failed to send email, returning OTP in response for dev', sendErr);
       // in dev mode return token; in prod we wouldn't do this

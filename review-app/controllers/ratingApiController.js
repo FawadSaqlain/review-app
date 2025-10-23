@@ -97,6 +97,7 @@ exports.summary = async (req, res) => {
 
 // GET /api/ratings/summary?offering=...
 exports.summary = async (req, res) => {
+  console.log('api.ratings.summary called');
   try {
     const offering = req.query.offering;
     if (!offering)
@@ -112,26 +113,65 @@ exports.summary = async (req, res) => {
 
     const key = process.env.GEMINI_API_KEY || process.env.GENAI_API_KEY;
 
-    if (key) {
-      try {
-        const { GoogleGenAI } = require('@google/genai');
-        const ai = new GoogleGenAI({ apiKey: key });
-        const prompt = `Summarize these student comments into a short concise paragraph (3-4 sentences):\n\n${comments.slice(0, 10).join('\n\n')}`;
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-        const text = typeof response.text === 'function'
-          ? await response.text()
-          : (response.text || response.outputText || response.result || null);
-
-        if (text)
-          return res.json({ success: true, data: { summary: text, avgOverall, avgMarks, count: ratings.length } });
-      } catch (e) {
-        console.warn(`GenAI summarization failed: ${e?.message || e}`);
+    // Helper to defensively extract text from a variety of possible SDK responses
+    const extractTextFromResponse = (resp) => {
+      if (!resp) return null;
+      if (typeof resp === 'string') return resp;
+      if (resp.outputText) return resp.outputText;
+      if (resp.text) return typeof resp.text === 'function' ? null : resp.text;
+      if (resp.result) return resp.result;
+      // check common nested shapes
+      if (Array.isArray(resp.outputs) && resp.outputs.length) {
+        return resp.outputs.map(o => o.content && (o.content.text || o.content)).join('\n') || null;
       }
+      if (Array.isArray(resp.candidates) && resp.candidates.length) {
+        const c = resp.candidates[0];
+        if (c.content && c.content[0] && c.content[0].text) return c.content[0].text;
+        if (c.content && c.content.text) return c.content.text;
+        if (c.text) return c.text;
+      }
+      try { return JSON.stringify(resp).slice(0, 2000); } catch (e) { return null; }
+    };
+
+    if (key) {
+      console.log('GenAI key configured, attempting remote summarization');
+      try {
+        let GoogleGenAI;
+        try {
+          GoogleGenAI = require('@google/genai').GoogleGenAI;
+        } catch (reqErr) {
+          console.warn('GenAI SDK not installed or failed to load:', reqErr && reqErr.message ? reqErr.message : reqErr);
+          GoogleGenAI = null;
+        }
+
+        if (GoogleGenAI) {
+          const ai = new GoogleGenAI({ apiKey: key });
+          const prompt = `Summarize these student comments into a short concise paragraph (3-4 sentences):\n\n${comments.slice(0, 10).join('\n\n')}`;
+          const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+
+          // Try to extract text safely
+          let text = extractTextFromResponse(response);
+          // If response.text is a function (stream-like), try calling it
+          if (!text && response && typeof response.text === 'function') {
+            try { text = await response.text(); } catch (e) { /* ignore */ }
+          }
+
+          if (text) {
+            console.log('GenAI summarization succeeded');
+            return res.json({ success: true, data: { summary: text, avgOverall, avgMarks, count: ratings.length } });
+          }
+          console.warn('GenAI returned no usable text, falling back to local summarizer; response shape:', typeof response, Object.keys(response || {}).slice(0,10));
+        }
+      } catch (e) {
+        console.warn('GenAI summarization failed:', e && e.message ? e.message : e);
+      }
+    } else {
+      console.log('No GenAI/Gemini API key configured; using local summarizer');
     }
 
     const summarizer = require('../lib/commentSummarizer');
     const result = summarizer.summarizeComments(comments, avgOverall, avgMarks);
-console.log(result);
+    // return local summary as fallback
     return res.json({
       success: true,
       data: { summary: result.summary, avgOverall, avgMarks, count: ratings.length }

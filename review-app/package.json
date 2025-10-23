@@ -7,7 +7,7 @@
     "seed-admin": "node scripts/seed-admin.js"
   },
   "dependencies": {
-    "@google/genai": "^1.25.0",
+    "@google/genai": "^1.26.0",
     "bcrypt": "^5.1.0",
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",

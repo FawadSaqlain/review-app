@@ -9,6 +9,10 @@ const fs = require('fs');
 // load environment
 require('dotenv').config();
 
+// Log whether GenAI/Gemini key is present (do not print the key itself)
+const hasGenAIKey = !!(process.env.GENAI_API_KEY || process.env.GEMINI_API_KEY);
+console.log('GenAI key present:', hasGenAIKey);
+
 // connect to MongoDB
 const mongoose = require('mongoose');
 mongoose.set('strictQuery', false);

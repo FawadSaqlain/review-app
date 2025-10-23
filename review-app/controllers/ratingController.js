@@ -30,6 +30,32 @@ exports.create = async (req, res) => {
   try {
     const { offering, answers, comment, anonymized, overallRating, obtainedMarks } = req.body;
     if (!offering) return res.status(400).json({ success: false, error: { message: 'offering required' } });
+
+    // Authorization: ensure only students who were taught in this offering can submit a review.
+    // Admins are still allowed to create ratings (for testing/management) — adjust if needed.
+    // Load offering to check section/semester/teacher
+    const offeringDoc = await Offering.findById(offering).lean();
+    if (!offeringDoc) return res.status(404).json({ success: false, error: { message: 'Offering not found' } });
+
+    // If the requester is not an admin, enforce that their section and semesterNumber match the offering.
+    if (!req.user || req.user.role !== 'admin') {
+      // require user to be authenticated student
+      if (!req.user) return res.status(401).json({ success: false, error: { message: 'Authentication required' } });
+
+      const userSection = (req.user.section || '').toString().trim();
+      const offeringSection = (offeringDoc.section || '').toString().trim();
+
+      // If offering has a semesterNumber, require user's semesterNumber to match
+      const offeringSem = offeringDoc.semesterNumber;
+      const userSem = req.user.semesterNumber;
+
+      const sectionMatches = offeringSection === '' || userSection === offeringSection;
+      const semesterMatches = (typeof offeringSem === 'undefined' || offeringSem === null) || (typeof userSem !== 'undefined' && userSem === offeringSem);
+
+      if (!sectionMatches || !semesterMatches) {
+        return res.status(403).json({ success: false, error: { message: 'Not allowed to review this offering — you were not enrolled in this class/section' } });
+      }
+    }
   // overallRating required and must be 1-5
   const or = parseInt(overallRating, 10);
   if (!or || or < 1 || or > 5) return res.status(400).json({ success: false, error: { message: 'overallRating (1-5) required' } });
@@ -102,7 +128,41 @@ exports.viewForOffering = async (req, res) => {
 exports.renderGiveList = async (req, res) => {
   try {
     // show offerings (populate course and teacher)
-    const offerings = await Offering.find().populate('course').populate('teacher').limit(200).lean();
+    // Only show offerings the current student is allowed to review.
+    // Admins see all offerings.
+    let filter = {};
+    if (!req.user) {
+      // should be protected by loginRequire, but guard defensively
+      return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+    }
+
+    if (req.user.role !== 'admin') {
+      const userSection = (req.user.section || '').toString().trim();
+      const userSem = req.user.semesterNumber;
+
+      // if we don't have a section for the user, they cannot give reviews for specific sections
+      if (!userSection) {
+        return res.render('rating-give-list', { title: 'Give Review', offerings: [] });
+      }
+
+      // match offerings where section equals the student's section
+      // and where semesterNumber is either not set or matches student's semester
+      filter = {
+        section: userSection,
+        $or: [ { semesterNumber: { $exists: false } }, { semesterNumber: null }, { semesterNumber: userSem } ]
+      };
+    }
+
+    let offerings = await Offering.find(filter).populate('course').populate('teacher').limit(200).lean();
+
+    // Remove offerings the student has already rated (they can view/edit those on the dashboard)
+    if (req.user && req.user.role !== 'admin' && offerings.length) {
+      const offeringIds = offerings.map(o => o._id);
+      const existingRatings = await Rating.find({ student: req.user._id, offering: { $in: offeringIds } }).select('offering').lean();
+      const existingSet = new Set(existingRatings.map(r => r.offering.toString()));
+      offerings = offerings.filter(o => !existingSet.has(o._id.toString()));
+    }
+
     return res.render('rating-give-list', { title: 'Give Review', offerings });
   } catch (err) {
     console.error('renderGiveList error', err);
