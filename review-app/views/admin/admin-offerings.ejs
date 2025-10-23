@@ -1,0 +1,51 @@
+<%- include('../partials/header') %>
+<main class="container">
+  <h1>Offerings by Term</h1>
+  <form id="termFilter" method="get" action="/admin/offerings">
+    <label for="termSelect">Term:</label>
+    <select id="termSelect" name="term">
+      <option value="">-- All / Active --</option>
+      <% terms.forEach(function(t){ %>
+        <option value="<%= t._id %>" <%= currentTerm && currentTerm._id && (String(currentTerm._id) === String(t._id)) ? 'selected' : '' %>><%= t.name %> <%= t.isActive ? '(active)' : '' %></option>
+      <% }) %>
+    </select>
+    <button type="submit">Filter</button>
+  </form>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Title</th>
+        <th>Teacher</th>
+        <th>Dept</th>
+        <th>Program</th>
+        <th>Sem</th>
+        <th>Section</th>
+        <th>Term</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% offerings.forEach(function(o){ %>
+        <tr>
+          <td><%= o.course && o.course.code ? o.course.code : '—' %></td>
+          <td><%= o.course && o.course.title ? o.course.title : '—' %></td>
+          <td><%= o.teacher && o.teacher.name ? (o.teacher.name.first + ' ' + (o.teacher.name.last||'')) : '—' %></td>
+          <td><%= o.department && o.department.name ? o.department.name : '—' %></td>
+          <td><%= o.program && o.program.name ? o.program.name : '—' %></td>
+          <td><%= o.semesterNumber || '—' %></td>
+          <td><%= o.section || '—' %></td>
+          <td><%= o.term && o.term.name ? o.term.name : '—' %></td>
+          <td>
+            <a href="/admin/offerings/<%= o._id %>/edit">Edit</a>
+            <form style="display:inline" method="post" action="/admin/offerings/<%= o._id %>/delete" onsubmit="return confirm('Delete offering?');">
+              <button type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</main>
+<%- include('../partials/footer') %>

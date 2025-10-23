@@ -5,6 +5,7 @@ const offeringSchema = new Schema({
   course: { type: Schema.Types.ObjectId, ref: 'Course', required: true, index: true },
   teacher: { type: Schema.Types.ObjectId, ref: 'Teacher', required: true, index: true },
   section: { type: String },
+  term: { type: Schema.Types.ObjectId, ref: 'Term' },
   department: { type: Schema.Types.ObjectId, ref: 'Department' },
   program: { type: Schema.Types.ObjectId, ref: 'Program' },
   semesterNumber: { type: Number }

@@ -136,6 +136,11 @@ exports.renderGiveList = async (req, res) => {
       return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
     }
 
+    // prepare term-related variables in outer scope so both admin and normal users can reference them
+    let activeTerm = null;
+    let nextTerm = null;
+    let termFilter = null;
+
     if (req.user.role !== 'admin') {
       const userSection = (req.user.section || '').toString().trim();
       const userSem = req.user.semesterNumber;
@@ -145,15 +150,40 @@ exports.renderGiveList = async (req, res) => {
         return res.render('rating-give-list', { title: 'Give Review', offerings: [] });
       }
 
-      // match offerings where section equals the student's section
-      // and where semesterNumber is either not set or matches student's semester
+      // determine term: allow override via ?term=<id>, otherwise use active term
+      const Term = require('../models').Term;
+      activeTerm = await Term.findOne({ isActive: true }).lean();
+      // compute next term name and ensure it exists (do not create here; only lookup)
+      if (activeTerm && activeTerm.name) {
+        const m = String(activeTerm.name).toLowerCase().match(/^(fa|sp)(\d{2})$/);
+        if (m) {
+          const season = m[1];
+          const y = parseInt(m[2], 10);
+          let nextName = null;
+          if (season === 'fa') nextName = 'sp' + String((y + 1)).padStart(2, '0');
+          else nextName = 'fa' + String(y).padStart(2, '0');
+          nextTerm = await Term.findOne({ name: nextName }).lean();
+        }
+      }
+
+      if (req.query && req.query.term) {
+        termFilter = req.query.term;
+      } else {
+        termFilter = activeTerm ? activeTerm._id : null;
+      }
+
+      // match offerings where section equals the student's section and term matches
       filter = {
         section: userSection,
+        term: termFilter,
         $or: [ { semesterNumber: { $exists: false } }, { semesterNumber: null }, { semesterNumber: userSem } ]
       };
+    } else {
+      // admin: allow optional term filter via query
+      if (req.query && req.query.term) termFilter = req.query.term;
     }
 
-    let offerings = await Offering.find(filter).populate('course').populate('teacher').limit(200).lean();
+    let offerings = await Offering.find(filter).populate('course').populate('teacher').populate('term').limit(200).lean();
 
     // Remove offerings the student has already rated (they can view/edit those on the dashboard)
     if (req.user && req.user.role !== 'admin' && offerings.length) {
@@ -163,7 +193,7 @@ exports.renderGiveList = async (req, res) => {
       offerings = offerings.filter(o => !existingSet.has(o._id.toString()));
     }
 
-    return res.render('rating-give-list', { title: 'Give Review', offerings });
+  return res.render('rating-give-list', { title: 'Give Review', offerings, activeTerm: activeTerm || null, nextTerm: nextTerm || null, selectedTerm: termFilter });
   } catch (err) {
     console.error('renderGiveList error', err);
     return res.status(500).send('Server error');

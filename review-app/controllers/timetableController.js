@@ -2,6 +2,7 @@ const pdfParse = require('pdf-parse');
 const mongoose = require('mongoose');
 const { Course, Teacher, Offering } = require('../models');
 const Audit = require('../models').Audit;
+const Term = require('../models').Term;
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
@@ -215,13 +216,176 @@ exports.uploadTimetable = async (req, res) => {
 // Render manual add-class form for admin
 exports.renderAddClassForm = async (req, res) => {
   try {
-    // no term concept — render form without term list
-    return res.render('admin-add-class', { terms: [], user: req.user });
+    // provide active term and next term for admin selection
+    const active = await Term.findOne({ isActive: true }).lean();
+    let next = null;
+    if (active && active.name) {
+      // compute next term name: if active starts with 'fa' -> next = 'sp' with year+1; if 'sp' -> next = 'fa' same year
+      const m = String(active.name).toLowerCase().match(/^(fa|sp)(\d{2})$/);
+      if (m) {
+        const season = m[1];
+        const y = parseInt(m[2], 10);
+        let nextName = null;
+        if (season === 'fa') nextName = 'sp' + String((y + 1)).padStart(2, '0');
+        else nextName = 'fa' + String(y).padStart(2, '0');
+        // try find next term; create it if missing (inactive)
+        let nextDoc = await Term.findOne({ name: nextName });
+        if (!nextDoc) {
+          nextDoc = new Term({ name: nextName, isActive: false });
+          await nextDoc.save();
+        }
+        next = nextDoc.toObject();
+      }
+    }
+
+    let terms = [];
+    if (active) terms.push(active);
+    if (next) terms.push(next);
+    // If there is no active term, fall back to listing all known terms (latest first)
+    if (!terms.length) {
+      const all = await Term.find().sort({ startDate: -1 }).lean();
+      terms = all || [];
+    }
+
+    return res.render('admin-add-class', { terms, user: req.user });
   } catch (err) {
     console.error('renderAddClassForm error', err && err.stack ? err.stack : err);
     return res.status(500).send('Server error');
   }
 };
+
+// List terms (admin)
+exports.listTerms = async (req, res) => {
+  try {
+    const terms = await Term.find().sort({ startDate: -1 }).lean();
+    return res.render('admin-terms', { title: 'Terms', terms });
+  } catch (err) {
+    console.error('listTerms error', err);
+    return res.status(500).send('Server error');
+  }
+};
+
+// Create a term (admin) - expects { name, startDate, endDate }
+exports.createTerm = async (req, res) => {
+  try {
+    const { name, startDate, endDate, isActive } = req.body;
+    if (!name) return res.status(400).json({ success: false, error: { message: 'name required' } });
+    const t = new Term({ name: String(name).trim(), startDate: startDate ? new Date(startDate) : undefined, endDate: endDate ? new Date(endDate) : undefined, isActive: !!isActive });
+    // if isActive true, deactivate others
+    if (t.isActive) await Term.updateMany({ _id: { $ne: t._id } }, { isActive: false });
+    await t.save();
+    await Audit.create({ action: 'term.create', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: t._id });
+    return res.status(201).json({ success: true, data: { term: t } });
+  } catch (err) {
+    console.error('createTerm error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
+  }
+};
+
+// Activate an existing term
+exports.activateTerm = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const term = await Term.findById(id);
+    if (!term) return res.status(404).json({ success: false, error: { message: 'Term not found' } });
+    // enforce start and end dates before activation
+    if (!term.startDate || !term.endDate) return res.status(400).json({ success: false, error: { message: 'Term must have startDate and endDate before activation' } });
+    await Term.updateMany({}, { isActive: false });
+    term.isActive = true;
+    await term.save();
+    await Audit.create({ action: 'term.activate', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: term._id });
+    return res.json({ success: true, data: { term } });
+  } catch (err) {
+    console.error('activateTerm error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
+  }
+};
+
+// Promote term: activate the term and create the following next term (with optional start/end dates)
+exports.promoteTerm = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { nextStartDate, nextEndDate } = req.body || {};
+    const term = await Term.findById(id);
+    if (!term) return res.status(404).json({ success: false, error: { message: 'Term not found' } });
+    // activate selected term
+    await Term.updateMany({}, { isActive: false });
+    term.isActive = true;
+    await term.save();
+    await Audit.create({ action: 'term.activate', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: term._id });
+
+    // compute next term name from activated term name
+    let nextName = null;
+    const m = String(term.name).toLowerCase().match(/^(fa|sp)(\d{2})$/);
+    if (m) {
+      const season = m[1];
+      const y = parseInt(m[2], 10);
+      if (season === 'fa') nextName = 'sp' + String(y + 1).padStart(2, '0');
+      else nextName = 'fa' + String(y).padStart(2, '0');
+    }
+
+    let createdNext = null;
+    if (nextName) {
+      let next = await Term.findOne({ name: nextName });
+      if (!next) {
+        next = new Term({ name: nextName, isActive: false });
+        if (nextStartDate) next.startDate = new Date(nextStartDate);
+        if (nextEndDate) next.endDate = new Date(nextEndDate);
+        await next.save();
+        createdNext = next;
+        await Audit.create({ action: 'term.create', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: next._id });
+      }
+    }
+
+    // If request comes from browser form, redirect back to terms page
+    const accept = req.headers && req.headers.accept ? req.headers.accept : '';
+    if (accept.indexOf('text/html') !== -1) return res.redirect('/admin/terms');
+
+    return res.json({ success: true, data: { activated: term, next: createdNext } });
+  } catch (err) {
+    console.error('promoteTerm error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
+  }
+};
+
+// Update term (set start/end dates and optionally activate)
+exports.updateTerm = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { startDate, endDate, activate } = req.body || {};
+    const term = await Term.findById(id);
+    if (!term) return res.status(404).json({ success: false, error: { message: 'Term not found' } });
+    if (startDate) term.startDate = new Date(startDate);
+    if (endDate) term.endDate = new Date(endDate);
+    if (activate) {
+      // require dates
+      if (!term.startDate || !term.endDate) return res.status(400).json({ success: false, error: { message: 'Start and End dates required to activate' } });
+      await Term.updateMany({}, { isActive: false });
+      term.isActive = true;
+    }
+    await term.save();
+    await Audit.create({ action: 'term.update', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: term._id });
+    const accept = req.headers && req.headers.accept ? req.headers.accept : '';
+    if (accept.indexOf('text/html') !== -1) return res.redirect('/admin/terms');
+    return res.json({ success: true, data: { term } });
+  } catch (err) {
+    console.error('updateTerm error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
+  }
+};
+
+// helper: resolve the term to use (req.body.term or req.query.term or active term)
+async function resolveTermFromRequest(req) {
+  const TermModel = Term;
+  const termId = (req.body && req.body.term) || (req.query && req.query.term);
+  if (termId) {
+    const t = await TermModel.findById(termId);
+    if (t) return t;
+  }
+  // fallback to active term
+  const active = await TermModel.findOne({ isActive: true });
+  return active || null;
+}
 
 // POST handler to add a single class manually (course + teacher + offering)
 exports.addClassManually = async (req, res) => {
@@ -254,7 +418,11 @@ exports.addClassManually = async (req, res) => {
 
     const summary = { createdCourses: 0, createdTeachers: 0, createdOfferings: 0, skipped: 0, details: [] };
 
-    for (const s of subjects) {
+  // resolve term (body may include term id)
+  const resolvedTerm = await resolveTermFromRequest(req);
+  if (!resolvedTerm) return res.status(400).json({ success: false, error: { code: 'ERR_NO_TERM', message: 'No active term and no term provided' } });
+
+  for (const s of subjects) {
       const code = s.code ? String(s.code).replace(/\s+/g, '').toUpperCase() : null;
       const title = s.title ? String(s.title).trim() : code;
       const teacherName = s.teacherName ? normalizeName(String(s.teacherName)) : null;
@@ -274,7 +442,7 @@ exports.addClassManually = async (req, res) => {
       if (!teacher) { teacher = new Teacher({ name: { first, last } }); await teacher.save(); summary.createdTeachers++; }
 
       // create offering if not exists
-      const offeringQuery = { course: course._id, teacher: teacher._id };
+      const offeringQuery = { course: course._id, teacher: teacher._id, term: resolvedTerm._id };
       if (section) offeringQuery.section = String(section).trim();
       let existing = await Offering.findOne(offeringQuery);
       if (!existing) {
@@ -282,6 +450,7 @@ exports.addClassManually = async (req, res) => {
           course: course._id,
           teacher: teacher._id,
           section: section ? String(section).trim() : undefined,
+          term: resolvedTerm._id,
           department: department._id,
           program: program._id,
           semesterNumber: Number(semesterNumber)
@@ -302,6 +471,93 @@ exports.addClassManually = async (req, res) => {
     const payload = { code: 'ERR_INTERNAL', message: isProd ? 'Server error' : (err && err.message) || 'Server error' };
     if (!isProd && err && err.stack) payload.stack = err.stack;
     return res.status(500).json({ success: false, error: payload });
+  }
+};
+
+// List offerings filtered by term (admin view)
+exports.listOfferingsByTerm = async (req, res) => {
+  try {
+    const termId = req.query.term;
+    let term = null;
+    if (termId) term = await Term.findById(termId).lean();
+    if (!term) term = await Term.findOne({ isActive: true }).lean();
+    const filter = {};
+    if (term && term._id) filter.term = term._id;
+    const offerings = await Offering.find(filter).populate('course teacher department program term').sort({ 'course.code': 1 }).lean();
+    const terms = await Term.find().sort({ startDate: -1 }).lean();
+  return res.render('admin/admin-offerings', { title: 'Offerings', offerings, terms, currentTerm: term, user: req.user });
+  } catch (err) {
+    console.error('listOfferingsByTerm error', err);
+    return res.status(500).send('Server error');
+  }
+};
+
+// Render offering edit form
+exports.renderOfferingEditForm = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const offering = await Offering.findById(id).populate('course teacher department program term').lean();
+    if (!offering) return res.status(404).send('Offering not found');
+    const terms = await Term.find().sort({ startDate: -1 }).lean();
+    const departments = await require('../models').Department.find().lean();
+    const programs = await require('../models').Program.find().lean();
+  return res.render('admin/admin-offering-edit', { title: 'Edit Offering', offering, terms, departments, programs, user: req.user });
+  } catch (err) {
+    console.error('renderOfferingEditForm error', err);
+    return res.status(500).send('Server error');
+  }
+};
+
+// Update offering (admin)
+exports.updateOffering = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const offering = await Offering.findById(id);
+    if (!offering) return res.status(404).json({ success: false, error: { message: 'Offering not found' } });
+    const { department: deptId, program: programId, semesterNumber, section, term: termId } = req.body;
+  const courseId = req.body.courseId;
+  const courseTitle = req.body.courseTitle;
+    if (deptId) offering.department = deptId;
+    if (programId) offering.program = programId;
+    if (typeof semesterNumber !== 'undefined') offering.semesterNumber = Number(semesterNumber) || offering.semesterNumber;
+    if (typeof section !== 'undefined') offering.section = section || offering.section;
+    if (termId) offering.term = termId;
+    // update course title if requested
+    if (courseId && courseTitle) {
+      try {
+        const Course = require('../models').Course;
+        await Course.findByIdAndUpdate(courseId, { title: String(courseTitle).trim() });
+      } catch (e) { console.warn('Could not update course title', e && e.message); }
+    }
+    await offering.save();
+    await Audit.create({ action: 'offering.update', actor: req.user ? req.user._id : null, targetType: 'Offering', targetId: offering._id });
+    // If request expects HTML (form submit), redirect back to listings for a smoother UX
+    const accept = req.headers && req.headers.accept ? req.headers.accept : '';
+    if (accept.indexOf('text/html') !== -1) {
+      return res.redirect('/admin/offerings');
+    }
+    return res.json({ success: true, data: { offering } });
+  } catch (err) {
+    console.error('updateOffering error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
+  }
+};
+
+// Delete offering (admin)
+exports.deleteOffering = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const offering = await Offering.findByIdAndDelete(id);
+    if (!offering) return res.status(404).json({ success: false, error: { message: 'Offering not found' } });
+    await Audit.create({ action: 'offering.delete', actor: req.user ? req.user._id : null, targetType: 'Offering', targetId: id });
+    const accept = req.headers && req.headers.accept ? req.headers.accept : '';
+    if (accept.indexOf('text/html') !== -1) {
+      return res.redirect('/admin/offerings');
+    }
+    return res.json({ success: true, data: { id } });
+  } catch (err) {
+    console.error('deleteOffering error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
   }
 };
 
@@ -370,7 +626,11 @@ exports.addClassesFromXlsx = async (req, res) => {
 
     const summary = { createdCourses: 0, createdTeachers: 0, createdOfferings: 0, skipped: 0, details: [] };
 
-    for (const r of rows) {
+  // resolve term (may be provided as a column 'term' or passed in body)
+  const resolvedTerm = await resolveTermFromRequest(req);
+  if (!resolvedTerm) return res.status(400).json({ success: false, error: { code: 'ERR_NO_TERM', message: 'No active term and no term provided' } });
+
+  for (const r of rows) {
       // attempt to find common header keys
       const code = r.code || r.Code || r['Course Code'] || r['course code'] || r['Code'] || r['code'] || r['course_code'];
       const title = r.title || r.Title || r['Course Title'] || r['course title'] || r['Title'] || r['title'];
@@ -399,11 +659,12 @@ exports.addClassesFromXlsx = async (req, res) => {
       let teacher = await Teacher.findOne({ 'name.first': new RegExp('^' + escapeRegExp(first) + '$', 'i'), 'name.last': new RegExp('^' + escapeRegExp(last) + '$', 'i') });
       if (!teacher) { teacher = new Teacher({ name: { first, last } }); await teacher.save(); summary.createdTeachers++; }
 
-      const offeringQuery = { course: course._id, teacher: teacher._id };
+      const offeringQuery = { course: course._id, teacher: teacher._id, term: resolvedTerm._id };
       if (section) offeringQuery.section = String(section).trim();
       let existing = await Offering.findOne(offeringQuery);
       if (!existing) {
         const offering = new Offering({ course: course._id, teacher: teacher._id, section: section ? String(section).trim() : undefined, department: department._id, program: program._id, semesterNumber: Number(semesterNumber) });
+        offering.term = resolvedTerm._id;
         await offering.save();
         summary.createdOfferings++;
       }

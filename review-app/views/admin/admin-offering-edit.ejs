@@ -1,0 +1,55 @@
+<%- include('../partials/header') %>
+<main class="container">
+  <h1>Edit Offering</h1>
+  <form method="post" action="/admin/offerings/<%= offering._id %>/edit">
+    <div>
+      <label>Course Code</label>
+      <input readonly value="<%= offering.course && offering.course.code ? offering.course.code : '' %>" />
+      <input type="hidden" name="courseId" value="<%= offering.course && offering.course._id ? offering.course._id : '' %>" />
+    </div>
+    <div>
+      <label for="courseTitle">Course Title</label>
+      <input id="courseTitle" name="courseTitle" value="<%= offering.course && offering.course.title ? offering.course.title : '' %>" />
+    </div>
+    <div>
+      <label for="department">Department</label>
+      <select id="department" name="department">
+        <option value="">-- Select Dept --</option>
+        <% departments.forEach(function(d){ %>
+          <option value="<%= d._id %>" <%= offering.department && offering.department._id && String(offering.department._id) === String(d._id) ? 'selected' : '' %>><%= d.name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label for="program">Program</label>
+      <select id="program" name="program">
+        <option value="">-- Select Program --</option>
+        <% programs.forEach(function(p){ %>
+          <option value="<%= p._id %>" <%= offering.program && offering.program._id && String(offering.program._id) === String(p._id) ? 'selected' : '' %>><%= p.name %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label for="semesterNumber">Semester Number</label>
+      <input id="semesterNumber" name="semesterNumber" type="number" min="1" max="12" value="<%= offering.semesterNumber || '' %>" />
+    </div>
+    <div>
+      <label for="section">Section</label>
+      <input id="section" name="section" value="<%= offering.section || '' %>" />
+    </div>
+    <div>
+      <label for="term">Term</label>
+      <select id="term" name="term">
+        <option value="">-- Select Term --</option>
+        <% terms.forEach(function(t){ %>
+          <option value="<%= t._id %>" <%= offering.term && offering.term._id && String(offering.term._id) === String(t._id) ? 'selected' : '' %>><%= t.name %> <%= t.isActive ? '(active)' : '' %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <button type="submit">Save</button>
+      <a href="/admin/offerings">Back to list</a>
+    </div>
+  </form>
+</main>
+<%- include('../partials/footer') %>

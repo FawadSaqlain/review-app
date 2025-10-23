@@ -3,12 +3,20 @@ const { Department, Program } = require('../models');
 // mapping of degree short codes (as appear in CUI email local-part) to department/program names
 // extend this object as needed
 const MAP = {
-  bse: { department: 'Computer Science', program: 'Software Engineering' },
-  ben: { department: 'Computer Science', program: 'Computer Engineering' },
+  baf: { department: 'Management Sciences', program: 'Accounting and Finance' },
+  bag: { department: 'Environmental Sciences', program: 'Agriculture' },
+  bba: { department: 'Management Sciences', program: 'Business Administration' },
   bcs: { department: 'Computer Science', program: 'Computer Science' },
-  bba: { department: 'Business', program: 'Business Administration' },
-  // add more mappings here
+  bec: { department: 'Economics', program: 'Economics' },
+  bed: { department: 'Education', program: 'Education' }, // not listed, assumed placeholder
+  ben: { department: 'Computer Science', program: 'Computer Engineering' }, // assumed
+  bes: { department: 'Environmental Sciences', program: 'Environmental Sciences' },
+  bmd: { department: 'Mathematics', program: 'Mathematics with Data Science' },
+  bse: { department: 'Computer Science', program: 'Software Engineering' },
+  bsm: { department: 'Mathematics', program: 'Mathematics' },
+  bty: { department: 'Biotechnology', program: 'Biotechnology' }
 };
+
 
 /**
  * Given a normalized email (lowercase), attempt to extract the degree short code

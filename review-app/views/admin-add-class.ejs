@@ -11,6 +11,17 @@
     </select>
   </div>
   <div>
+    <label for="term">Term</label>
+    <select id="term" name="term">
+      <option value="">-- Use active term --</option>
+      <% if (terms && terms.length) { %>
+        <% terms.forEach(function(t) { %>
+          <option value="<%= t._id %>" <%= t.isActive ? 'selected' : '' %>><%= t.name %> <%= t.isActive ? '(active)' : '' %></option>
+        <% }); %>
+      <% } %>
+    </select>
+  </div>
+  <div>
     <label for="program">Program / Degree</label>
     <select id="program" name="program" required>
       <option value="">-- Select Program --</option>
@@ -43,6 +54,17 @@
     <div>
       <label for="file">Choose .xlsx file</label>
       <input id="file" name="file" type="file" accept=".xlsx,.xls" required />
+    </div>
+    <div>
+      <label for="uploadTerm">Term (optional)</label>
+      <select id="uploadTerm" name="term">
+        <option value="">-- Use active term --</option>
+        <% if (terms && terms.length) { %>
+          <% terms.forEach(function(t) { %>
+            <option value="<%= t._id %>" <%= t.isActive ? 'selected' : '' %>><%= t.name %> <%= t.isActive ? '(active)' : '' %></option>
+          <% }); %>
+        <% } %>
+      </select>
     </div>
     <div>
       <button type="submit">Upload and Add Classes</button>

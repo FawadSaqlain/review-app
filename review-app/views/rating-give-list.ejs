@@ -1,4 +1,17 @@
 <h1>Give Reviews</h1>
+<div>
+  <label for="termSelect">Term: </label>
+  <select id="termSelect">
+    <option value="">-- Active term --</option>
+    <% if (activeTerm) { %>
+      <option value="<%= activeTerm._id %>" <%= selectedTerm && (String(selectedTerm) === String(activeTerm._id)) ? 'selected' : '' %>><%= activeTerm.name %> (active)</option>
+    <% } %>
+    <% if (nextTerm) { %>
+      <option value="<%= nextTerm._id %>" <%= selectedTerm && (String(selectedTerm) === String(nextTerm._id)) ? 'selected' : '' %>><%= nextTerm.name %> (next)</option>
+    <% } %>
+  </select>
+</div>
+
 <ul>
   <% offerings.forEach(function(o){ %>
     <li>
@@ -9,3 +22,12 @@
     </li>
   <% }) %>
 </ul>
+
+<script>
+  document.getElementById('termSelect')?.addEventListener('change', function () {
+    const val = this.value;
+    const url = new URL(window.location.href);
+    if (val) url.searchParams.set('term', val); else url.searchParams.delete('term');
+    window.location.href = url.toString();
+  });
+</script>

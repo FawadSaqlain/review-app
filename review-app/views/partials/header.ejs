@@ -12,6 +12,8 @@
   <!-- Admin link is conditional: defaults to login page; client script will switch to add page when authenticated -->
   <a id="adminLink" href="/admin/login">Admin</a>
   <a id="adminUsersLink" href="/admin/users" style="display:none; margin-left:10px;">Manage Users</a>
+  <a id="adminOfferingsLink" href="/admin/offerings" style="display:none; margin-left:10px;">Manage Offerings</a>
+  <a id="adminTermsLink" href="/admin/terms" style="display:none; margin-left:10px;">Terms</a>
   <a id="userLink" href="/profile" style="display:none; margin-left:10px;">My Profile</a>
   <a id="giveReviewLink" href="/ratings/give" style="display:none; margin-left:10px;">Give Review</a>
   <a id="viewRatingsLink" href="/ratings" style="display:none; margin-left:10px;">View Ratings</a>
@@ -45,6 +47,8 @@
           adminLink.href = '/admin/class/add';
           adminLink.textContent = 'Admin • Dashboard';
           adminUsersLink.style.display = 'inline-block';
+          adminOfferingsLink.style.display = 'inline-block';
+          adminTermsLink.style.display = 'inline-block';
           adminLogout.style.display = 'inline-block';
           // show ratings view to admins
           document.getElementById('viewRatingsLink').style.display = 'inline-block';
@@ -52,6 +56,8 @@
           adminLink.href = '/admin/login';
           adminLink.textContent = 'Admin';
           adminUsersLink.style.display = 'none';
+          adminOfferingsLink.style.display = 'none';
+          adminTermsLink.style.display = 'none';
           adminLogout.style.display = 'none';
         }
 

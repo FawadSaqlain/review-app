@@ -1,0 +1,78 @@
+<h1>Admin — Terms</h1>
+<p>Note: Terms must have Start and End dates before they can be activated. To create new terms, use the admin API or add via the database.</p>
+<hr />
+<h2>Existing Terms</h2>
+<table>
+  <thead>
+    <tr><th>Name</th><th>Start</th><th>End</th><th>Active</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    <% if (terms && terms.length) { %>
+      <% terms.forEach(function(t) { %>
+        <tr>
+          <td><%= t.name %></td>
+          <td><%= t.startDate ? t.startDate.toISOString().slice(0,10) : '' %></td>
+          <td><%= t.endDate ? t.endDate.toISOString().slice(0,10) : '' %></td>
+          <td><%= t.isActive ? 'Yes' : 'No' %></td>
+          <td>
+            <!-- inline edit form: set start/end dates and optionally activate -->
+            <form method="post" action="/admin/terms/<%= t._id %>/edit" style="display:inline">
+              <input type="date" name="startDate" value="<%= t.startDate ? t.startDate.toISOString().slice(0,10) : '' %>" />
+              <input type="date" name="endDate" value="<%= t.endDate ? t.endDate.toISOString().slice(0,10) : '' %>" />
+              <label style="margin-left:6px;"><input type="checkbox" name="activate" value="1" /> Activate</label>
+              <button type="submit" style="margin-left:6px;">Save</button>
+            </form>
+            <form method="post" action="/admin/terms/<%= t._id %>/promote" style="display:inline; margin-left:8px;" onsubmit="return promoteHandler(this);">
+              <input type="date" name="nextStartDate" title="Next term start date" />
+              <input type="date" name="nextEndDate" title="Next term end date" />
+              <button type="submit">Promote & Create Next</button>
+            </form>
+          </td>
+        </tr>
+      <% }); %>
+    <% } else { %>
+      <tr><td colspan="5">No terms</td></tr>
+    <% } %>
+  </tbody>
+</table>
+
+<script>
+document.getElementById('createTermForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const payload = {};
+  fd.forEach((v,k) => { if (k === 'isActive') payload[k] = true; else payload[k] = v; });
+  try {
+    const token = localStorage.getItem('adminToken');
+    const headers = token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+    const res = await fetch(e.target.action, { method: 'POST', headers, body: JSON.stringify(payload) });
+    const j = await res.json();
+    if (j && j.success) {
+      alert('Term created');
+      window.location.reload();
+    } else {
+      alert('Error: ' + (j && j.error && j.error.message ? j.error.message : 'unknown'));
+    }
+  } catch (err) { alert('Network: ' + err.message); }
+});
+</script>
+<script>
+async function promoteHandler(form) {
+  try {
+    const fd = new FormData(form);
+    const payload = {};
+    fd.forEach((v,k) => { if (v) payload[k] = v; });
+    const token = localStorage.getItem('adminToken');
+    const headers = token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+    const res = await fetch(form.action, { method: 'POST', headers, body: JSON.stringify(payload) });
+    const j = await res.json();
+    if (j && j.success) {
+      alert('Promoted term and created next: ' + (j.data.next ? j.data.next.name : 'next not created'));
+      window.location.reload();
+    } else {
+      alert('Error: ' + (j && j.error && j.error.message ? j.error.message : 'unknown'));
+    }
+  } catch (e) { alert('Network: ' + e.message); }
+  return false; // prevent default form submit
+}
+</script>
