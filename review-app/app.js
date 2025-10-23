@@ -49,9 +49,12 @@ app.set('view engine', 'ejs');
 // ensure uploads dir exists
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+// ensure tmp dir for express-fileupload temp files exists
+const tmpDir = path.join(__dirname, 'tmp');
+if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 
-// file upload middleware (limit 1MB)
-app.use(fileUpload({ limits: { fileSize: 1 * 1024 * 1024 } }));
+// file upload middleware: increase limit to 10MB and use temp files for stability
+app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 }, useTempFiles: true, tempFileDir: path.join(__dirname, 'tmp') }));
 
 app.use(logger('dev'));
 app.use(express.json());

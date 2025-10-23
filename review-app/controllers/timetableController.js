@@ -2,6 +2,9 @@ const pdfParse = require('pdf-parse');
 const mongoose = require('mongoose');
 const { Course, Teacher, Offering } = require('../models');
 const Audit = require('../models').Audit;
+const ExcelJS = require('exceljs');
+const fs = require('fs');
+const path = require('path');
 
 // Helper: normalize name "First Last"
 function normalizeName(name) {
@@ -301,3 +304,122 @@ exports.addClassManually = async (req, res) => {
     return res.status(500).json({ success: false, error: payload });
   }
 };
+
+// POST handler: parse uploaded XLSX and add classes in bulk
+exports.addClassesFromXlsx = async (req, res) => {
+  try {
+    // Support multer-style (req.file.buffer), express-fileupload (req.files.file.data),
+    // and express-fileupload with useTempFiles (req.files.file.tempFilePath).
+    let buffer = null;
+    let tempPath = null;
+    if (req.file && req.file.buffer) {
+      buffer = req.file.buffer;
+    } else if (req.files && req.files.file) {
+      const f = req.files.file;
+      if (f.data && f.data.length && f.data.length > 0) {
+        buffer = f.data;
+      } else if (f.tempFilePath) {
+        tempPath = f.tempFilePath;
+      }
+    }
+
+    if (!buffer && !tempPath) return res.status(400).json({ success: false, error: { code: 'ERR_NO_FILE', message: 'Excel file required' } });
+
+    // extra diagnostics: check buffer length or temp file stats
+    // optional diagnostics removed - keep code minimal
+
+    const workbook = new ExcelJS.Workbook();
+    try {
+      if (buffer) {
+        if (!buffer || buffer.length === 0) throw new Error('uploaded buffer empty');
+        await workbook.xlsx.load(buffer);
+      } else {
+        // read from temp file path
+        const st = fs.statSync(tempPath);
+        if (!st || st.size === 0) throw new Error('uploaded temp file empty');
+        await workbook.xlsx.readFile(tempPath);
+      }
+    } finally {
+      // cleanup temp file if present
+      try { if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch (e) { /* ignore cleanup errors */ }
+    }
+    const worksheet = workbook.worksheets && workbook.worksheets[0];
+    if (!worksheet) return res.status(400).json({ success: false, error: { code: 'ERR_EMPTY', message: 'No sheets found in workbook' } });
+
+    // Convert rows to objects using header row (first non-empty row assumed headers)
+    const rows = [];
+    let headerMap = null;
+    const maxRows = 2000; // safety cap
+    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rows.length > maxRows) return; // stop collecting beyond cap
+      const values = row.values ? row.values.slice(1) : [];
+      if (!headerMap) {
+        // build header map from this row
+        headerMap = values.map(h => (h || '').toString().trim());
+        return;
+      }
+      const obj = {};
+      for (let i = 0; i < headerMap.length; i++) {
+        const key = headerMap[i] || `col${i}`;
+        obj[key] = values[i] !== undefined ? values[i] : '';
+      }
+      rows.push(obj);
+    });
+
+    if (!rows || rows.length === 0) return res.status(400).json({ success: false, error: { code: 'ERR_EMPTY', message: 'No data rows found in sheet' } });
+
+    const summary = { createdCourses: 0, createdTeachers: 0, createdOfferings: 0, skipped: 0, details: [] };
+
+    for (const r of rows) {
+      // attempt to find common header keys
+      const code = r.code || r.Code || r['Course Code'] || r['course code'] || r['Code'] || r['code'] || r['course_code'];
+      const title = r.title || r.Title || r['Course Title'] || r['course title'] || r['Title'] || r['title'];
+      const teacherName = r.teacher || r.Teacher || r['Teacher Name'] || r['teacher name'] || r['Instructor'] || r['instructor'];
+      const deptName = r.department || r.Department || r['Department'] || 'Unknown';
+      const programName = r.program || r.Program || r['Program'] || 'Unknown';
+      const semesterNumber = r.semesterNumber || r.Semester || r['Semester Number'] || 1;
+      const section = r.section || r.Section || r['Section'] || undefined;
+
+      const codeNorm = code ? String(code).replace(/\s+/g, '').toUpperCase() : null;
+      const teacherNorm = teacherName ? normalizeName(String(teacherName)) : null;
+
+      if (!codeNorm || !teacherNorm) { summary.skipped++; summary.details.push({ row: r, reason: 'missing code or teacher' }); continue; }
+
+      let department = await require('../models').Department.findOne({ name: String(deptName).trim() });
+      if (!department) { department = new (require('../models').Department)({ name: String(deptName).trim() }); await department.save(); }
+      let program = await require('../models').Program.findOne({ name: String(programName).trim(), department: department._id });
+      if (!program) { program = new (require('../models').Program)({ name: String(programName).trim(), department: department._id }); await program.save(); }
+
+      let course = await Course.findOne({ code: codeNorm });
+      if (!course) { course = new Course({ code: codeNorm, title: String(title || codeNorm) }); await course.save(); summary.createdCourses++; }
+
+      const parts = teacherNorm.split(/\s+/).filter(Boolean);
+      const first = parts[0] || '';
+      const last = parts.slice(1).join(' ') || '';
+      let teacher = await Teacher.findOne({ 'name.first': new RegExp('^' + escapeRegExp(first) + '$', 'i'), 'name.last': new RegExp('^' + escapeRegExp(last) + '$', 'i') });
+      if (!teacher) { teacher = new Teacher({ name: { first, last } }); await teacher.save(); summary.createdTeachers++; }
+
+      const offeringQuery = { course: course._id, teacher: teacher._id };
+      if (section) offeringQuery.section = String(section).trim();
+      let existing = await Offering.findOne(offeringQuery);
+      if (!existing) {
+        const offering = new Offering({ course: course._id, teacher: teacher._id, section: section ? String(section).trim() : undefined, department: department._id, program: program._id, semesterNumber: Number(semesterNumber) });
+        await offering.save();
+        summary.createdOfferings++;
+      }
+      summary.details.push({ row: r, courseId: course._id, teacherId: teacher._id });
+    }
+
+    await Audit.create({ action: 'timetable.bulkUpload', actor: req.user ? req.user._id : null, targetType: 'BulkUpload', details: summary });
+
+    return res.status(200).json({ success: true, data: summary });
+  } catch (err) {
+    console.error('addClassesFromXlsx error', err && err.stack ? err.stack : err);
+    const isProd = process.env.NODE_ENV === 'production';
+    const payload = { code: 'ERR_INTERNAL', message: isProd ? 'Server error' : (err && err.message) || 'Server error' };
+    if (!isProd && err && err.stack) payload.stack = err.stack;
+    return res.status(500).json({ success: false, error: payload });
+  }
+};
+
+// debug endpoint removed

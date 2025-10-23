@@ -16,6 +16,8 @@ const userSchema = new Schema({
   degreeShort: { type: String },
   rollNumber: { type: String },
   semesterNumber: { type: Number },
+  department: { type: Schema.Types.ObjectId, ref: 'Department' },
+  program: { type: Schema.Types.ObjectId, ref: 'Program' },
   // profile fields
   section: { type: String },
   phone: { type: String },

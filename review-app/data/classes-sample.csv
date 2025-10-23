@@ -1,0 +1,6 @@
+code,title,teacher,department,program,semesterNumber,section
+CS-101,Introduction to Computer Science,Jane Doe,Computer Science,Bachelor of Science in Computer Science,1,A
+CS-102,Data Structures,John Smith,Computer Science,Bachelor of Science in Computer Science,2,A
+CS-201,Algorithms,Emily Khan,Computer Science,Bachelor of Science in Computer Science,3,B
+HCI-101,Human Computer Interaction,Sidra Ali,Computer Science,Bachelor of Science in Computer Science,3,B
+SPM-101,Software Project Management,Ayesha Khan,Computer Science,Bachelor of Software Engineering,5,B

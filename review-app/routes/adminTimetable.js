@@ -1,8 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
 const timetableController = require('../controllers/timetableController');
 const adminAuth = require('../middleware/adminAuth');
 
@@ -12,5 +9,7 @@ const adminAuth = require('../middleware/adminAuth');
 const adminRequire = require('../middleware/adminRequire');
 router.get('/class/add', adminRequire, timetableController.renderAddClassForm);
 router.post('/class/add', adminAuth, timetableController.addClassManually);
+// Batch upload (XLSX) to add classes in bulk — uses express-fileupload middleware (app.js)
+router.post('/class/upload', adminAuth, timetableController.addClassesFromXlsx);
 
 module.exports = router;

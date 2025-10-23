@@ -7,9 +7,15 @@ document.addEventListener('submit', async (e) => {
     const formData = new FormData(form);
     const token = localStorage.getItem('adminToken');
     const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
-  const res = await fetch(form.action, { method: 'POST', headers, body: formData, credentials: 'same-origin' });
-    const data = await res.json().catch(() => null);
-    document.getElementById('result').textContent = JSON.stringify(data || { status: res.status }, null, 2);
+    const res = await fetch(form.action, { method: 'POST', headers, body: formData, credentials: 'same-origin' });
+    const text = await res.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch (e) { data = null; }
+    // Prefer uploadResult (page-specific) then generic result element
+    const resultEl = document.getElementById('uploadResult') || document.getElementById('result');
+    if (resultEl) {
+      resultEl.textContent = JSON.stringify(data || { status: res.status, body: text.slice(0,200) }, null, 2);
+    }
     return;
   }
 

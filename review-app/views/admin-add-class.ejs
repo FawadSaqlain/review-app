@@ -37,6 +37,20 @@
   </div>
 </form>
 
+  <hr />
+  <h3>Or upload .xlsx (bulk)</h3>
+  <form id="uploadForm" method="post" action="/admin/class/upload" enctype="multipart/form-data">
+    <div>
+      <label for="file">Choose .xlsx file</label>
+      <input id="file" name="file" type="file" accept=".xlsx,.xls" required />
+    </div>
+    <div>
+      <button type="submit">Upload and Add Classes</button>
+    </div>
+    <div id="uploadResult" style="margin-top:8px; color:green;"></div>
+  </form>
+
+
 <script>
 // Mapping provided by admin (hard-coded here for now)
 const deptPrograms = {
@@ -142,4 +156,34 @@ document.getElementById('addClassForm').addEventListener('submit', async functio
     alert('Network error: ' + err.message);
   }
 });
+
+// upload form submit
+document.getElementById('uploadForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const form = e.target;
+  const fileInput = document.getElementById('file');
+  if (!fileInput.files || fileInput.files.length === 0) return alert('Please select a file');
+  const fd = new FormData(); fd.append('file', fileInput.files[0]);
+  try {
+    const token = localStorage.getItem('adminToken');
+    const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+    const res = await fetch(form.action, { method: 'POST', headers, body: fd });
+    const text = await res.text();
+    const el = document.getElementById('uploadResult');
+    // Try parsing JSON; if not JSON, show raw text to help debugging
+    let j = null;
+    try { j = JSON.parse(text); } catch (e) { j = null; }
+    if (j && j.success) {
+      el.style.color = 'green'; el.textContent = 'Upload succeeded. ' + (j.data && j.data.createdOfferings ? (j.data.createdOfferings + ' offerings created.') : '');
+    } else if (j && j.error) {
+      el.style.color = 'crimson'; el.textContent = 'Upload failed: ' + (j.error && j.error.message ? j.error.message : JSON.stringify(j.error));
+    } else {
+      el.style.color = 'crimson'; el.textContent = 'Upload failed (non-JSON response): ' + text.slice(0,200);
+    }
+  } catch (err) {
+    const el = document.getElementById('uploadResult'); el.style.color = 'crimson'; el.textContent = 'Network error: ' + err.message;
+  }
+});
+
+// Debug button removed
 </script>

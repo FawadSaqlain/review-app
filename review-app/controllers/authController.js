@@ -95,6 +95,18 @@ exports.signup = async (req, res) => {
       rollNumber: rollStr,
       semesterNumber
     });
+    // attempt to set department/program from email mapping (optional)
+    try {
+      const mapUtil = require('../utils/emailProgramMap');
+      const resolved = await mapUtil.resolveByEmail(normalizedEmail);
+      if (resolved) {
+        user.department = resolved.departmentId;
+        user.program = resolved.programId;
+      }
+    } catch (e) {
+      console.warn('email->program mapping failed', e && e.message ? e.message : e);
+    }
+
     await user.save();
 
     // create OTP token (6-digit) and store hashed
@@ -228,9 +240,30 @@ exports.login = async (req, res) => {
 exports.me = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: { message: 'Not authenticated' } });
-    // return user fields safe for client
-    const u = req.user.toObject ? req.user.toObject() : req.user;
-    // remove sensitive fields
+
+    // re-fetch user to populate department/program names
+    const User = require('../models').User;
+    let user = await User.findById(req.user._id).populate('department').populate('program');
+    if (!user) return res.status(401).json({ success: false, error: { message: 'Not authenticated' } });
+
+    // if department/program missing, try to resolve from email and persist (lazy backfill)
+    try {
+      if ((!user.department || !user.program) && user.email) {
+        const mapUtil = require('../utils/emailProgramMap');
+        const resolved = await mapUtil.resolveByEmail(user.email);
+        if (resolved) {
+          user.department = user.department || resolved.departmentId;
+          user.program = user.program || resolved.programId;
+          await user.save();
+          // re-populate after save
+          user = await User.findById(user._id).populate('department').populate('program');
+        }
+      }
+    } catch (e) {
+      console.warn('me: email->program mapping failed', e && e.message ? e.message : e);
+    }
+
+    const u = user.toObject ? user.toObject() : user;
     delete u.passwordHash;
     delete u.__v;
     return res.json({ success: true, data: { user: u } });
@@ -324,6 +357,19 @@ exports.completeProfile = async (req, res) => {
     }
 
     user.profileComplete = true;
+    // try to set department/program from email if not already set
+    try {
+      if (!user.department || !user.program) {
+        const mapUtil = require('../utils/emailProgramMap');
+        const resolved = await mapUtil.resolveByEmail(user.email);
+        if (resolved) {
+          user.department = user.department || resolved.departmentId;
+          user.program = user.program || resolved.programId;
+        }
+      }
+    } catch (e) {
+      console.warn('completeProfile: email->program mapping failed', e && e.message ? e.message : e);
+    }
     await user.save();
 
     await Audit.create({ action: 'user.completeProfile', actor: user._id, targetType: 'User', targetId: user._id });
@@ -343,9 +389,29 @@ exports.viewProfile = async (req, res) => {
     else {
       const email = req.query.email || '';
       if (!email) return res.status(400).send('Email required');
-      user = await User.findOne({ email: email.toLowerCase() });
+      const User = require('../models').User;
+      user = await User.findOne({ email: email.toLowerCase() }).populate('department').populate('program');
       if (!user) return res.status(404).send('User not found');
     }
+    // if department/program missing, try to resolve and save
+    try {
+      const User = require('../models').User;
+      let fresh = await User.findById(user._id).populate('department').populate('program');
+      if ((!fresh.department || !fresh.program) && fresh.email) {
+        const mapUtil = require('../utils/emailProgramMap');
+        const resolved = await mapUtil.resolveByEmail(fresh.email);
+        if (resolved) {
+          fresh.department = fresh.department || resolved.departmentId;
+          fresh.program = fresh.program || resolved.programId;
+          await fresh.save();
+          fresh = await User.findById(fresh._id).populate('department').populate('program');
+        }
+      }
+      user = fresh;
+    } catch (e) {
+      console.warn('viewProfile: email->program mapping failed', e && e.message ? e.message : e);
+    }
+
     return res.render('profile', { title: 'My Profile', user });
   } catch (err) {
     console.error('viewProfile error', err);

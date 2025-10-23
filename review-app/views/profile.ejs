@@ -2,7 +2,13 @@
 	<h2>My Profile</h2>
 	<p><strong>Email:</strong> <%= user.email %></p>
 <p><strong>Name:</strong> <%= user.name && user.name.first ? user.name.first : '' %> <%= user.name && user.name.last ? user.name.last : '' %></p>
-<p><strong>Degree:</strong> <%= user.degreeShort || '' %></p>
+<p><strong>Degree / Program:</strong>
+  <% if (user.program && user.program.name) { %>
+    <%= user.program.name %> (<%= user.department && user.department.name ? user.department.name : '' %>)
+  <% } else { %>
+    <%= user.degreeShort || '' %>
+  <% } %>
+</p>
 <p><strong>Intake:</strong> <%= user.intake ? (user.intake.season + user.intake.year) : '' %></p>
 <p><strong>Semester:</strong> <%= user.semesterNumber || '' %></p>
 <p><strong>Section:</strong> <%= user.section || '' %></p>
