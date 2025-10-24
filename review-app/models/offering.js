@@ -11,7 +11,9 @@ const offeringSchema = new Schema({
   semesterNumber: { type: Number }
 }, { timestamps: true });
 
-// Unique per course+teacher+section to avoid duplicate identical offerings
-offeringSchema.index({ course: 1, teacher: 1, section: 1 }, { unique: true });
+// Unique per course+teacher+term+section to avoid duplicate identical offerings across terms
+// Note: if your database already has a different unique index (older schema), you'll need to drop it
+// in the database (mongo shell or Mongo GUI) before this new index can be created without error.
+offeringSchema.index({ course: 1, teacher: 1, term: 1, section: 1 }, { unique: true });
 
 module.exports = mongoose.model('Offering', offeringSchema);

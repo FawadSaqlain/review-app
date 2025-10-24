@@ -173,8 +173,18 @@ exports.uploadTimetable = async (req, res) => {
       const existing = await Offering.findOne({ course: course._id, teacher: teacher._id, term: term._id });
       if (!existing) {
         const offering = new Offering({ course: course._id, teacher: teacher._id, term: term._id });
-        await offering.save();
-        summary.createdOfferings++;
+        try {
+          await offering.save();
+          summary.createdOfferings++;
+        } catch (saveErr) {
+          // handle duplicate key errors gracefully during bulk operations
+          if (saveErr && (saveErr.code === 11000 || saveErr.code === 11001)) {
+            summary.skipped++;
+            summary.details.push({ entry: e, reason: 'duplicate offering', error: (saveErr.keyValue || saveErr.message) });
+          } else {
+            throw saveErr;
+          }
+        }
       }
 
       summary.details.push({ entry: e, courseId: course._id, teacherId: teacher._id });
@@ -258,7 +268,10 @@ exports.renderAddClassForm = async (req, res) => {
 exports.listTerms = async (req, res) => {
   try {
     const terms = await Term.find().sort({ startDate: -1 }).lean();
-    return res.render('admin-terms', { title: 'Terms', terms });
+    // pass optional messages from query string (used after redirects)
+    const message = req.query && req.query.message ? req.query.message : null;
+    const error = req.query && req.query.error ? req.query.error : null;
+    return res.render('admin-terms', { title: 'Terms', terms, message, error });
   } catch (err) {
     console.error('listTerms error', err);
     return res.status(500).send('Server error');
@@ -308,6 +321,25 @@ exports.promoteTerm = async (req, res) => {
     const { nextStartDate, nextEndDate } = req.body || {};
     const term = await Term.findById(id);
     if (!term) return res.status(404).json({ success: false, error: { message: 'Term not found' } });
+
+    // If the request provided start/end dates (from the UI), persist them first
+    if (req.body && (req.body.startDate || req.body.endDate)) {
+      if (req.body.startDate) term.startDate = new Date(req.body.startDate);
+      if (req.body.endDate) term.endDate = new Date(req.body.endDate);
+      await term.save();
+    }
+
+    // Enforce that the selected term has startDate and endDate before activating
+    if (!term.startDate || !term.endDate) {
+      const accept = req.headers && req.headers.accept ? req.headers.accept : '';
+      const errMsg = 'Selected term must have Start and End dates before it can be activated.';
+      if (accept.indexOf('text/html') !== -1) {
+        // redirect back with an error query so the UI can display the message
+        return res.redirect('/admin/terms?error=' + encodeURIComponent(errMsg));
+      }
+      return res.status(400).json({ success: false, error: { message: errMsg } });
+    }
+
     // activate selected term
     await Term.updateMany({}, { isActive: false });
     term.isActive = true;
@@ -329,6 +361,7 @@ exports.promoteTerm = async (req, res) => {
       let next = await Term.findOne({ name: nextName });
       if (!next) {
         next = new Term({ name: nextName, isActive: false });
+        // next term dates may be provided optionally, but not required
         if (nextStartDate) next.startDate = new Date(nextStartDate);
         if (nextEndDate) next.endDate = new Date(nextEndDate);
         await next.save();
@@ -337,9 +370,9 @@ exports.promoteTerm = async (req, res) => {
       }
     }
 
-    // If request comes from browser form, redirect back to terms page
+    // If request comes from browser form, redirect back to terms page with success message
     const accept = req.headers && req.headers.accept ? req.headers.accept : '';
-    if (accept.indexOf('text/html') !== -1) return res.redirect('/admin/terms');
+    if (accept.indexOf('text/html') !== -1) return res.redirect('/admin/terms?message=' + encodeURIComponent('Term activated and next term created'));
 
     return res.json({ success: true, data: { activated: term, next: createdNext } });
   } catch (err) {
@@ -450,13 +483,22 @@ exports.addClassManually = async (req, res) => {
           course: course._id,
           teacher: teacher._id,
           section: section ? String(section).trim() : undefined,
-          term: resolvedTerm._id,
           department: department._id,
           program: program._id,
           semesterNumber: Number(semesterNumber)
         });
-        await offering.save();
-        summary.createdOfferings++;
+        offering.term = resolvedTerm._id;
+        try {
+          await offering.save();
+          summary.createdOfferings++;
+        } catch (saveErr) {
+          if (saveErr && (saveErr.code === 11000 || saveErr.code === 11001)) {
+            summary.skipped++;
+            summary.details.push({ row: r, reason: 'duplicate offering', error: (saveErr.keyValue || saveErr.message) });
+          } else {
+            throw saveErr;
+          }
+        }
       }
 
       summary.details.push({ subject: s, courseId: course._id, teacherId: teacher._id });

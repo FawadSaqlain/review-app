@@ -1,19 +1,21 @@
 <h1>Give Reviews</h1>
 <div>
-  <label for="termSelect">Term: </label>
-  <select id="termSelect">
-    <option value="">-- Active term --</option>
-    <% if (activeTerm) { %>
-      <option value="<%= activeTerm._id %>" <%= selectedTerm && (String(selectedTerm) === String(activeTerm._id)) ? 'selected' : '' %>><%= activeTerm.name %> (active)</option>
-    <% } %>
-    <% if (nextTerm) { %>
-      <option value="<%= nextTerm._id %>" <%= selectedTerm && (String(selectedTerm) === String(nextTerm._id)) ? 'selected' : '' %>><%= nextTerm.name %> (next)</option>
-    <% } %>
-  </select>
+  <% if (activeTerm) { %>
+    <label>Term: <strong><%= activeTerm.name %> (active)</strong></label>
+  <% } else { %>
+    <label>Term: <strong>Not available</strong></label>
+  <% } %>
 </div>
 
 <ul>
-  <% offerings.forEach(function(o){ %>
+  <% 
+    const activeTermId = activeTerm ? String(activeTerm._id) : null;
+    offerings.forEach(function(o){ 
+      // resolve offering.term whether populated (object) or just an id
+      let offeringTermId = null;
+      if (o && o.term) offeringTermId = String(o.term._id ? o.term._id : o.term);
+      if (!activeTermId || !offeringTermId || offeringTermId !== activeTermId) return;
+  %>
     <li>
       <strong><%= o.course && o.course.title ? o.course.title : 'Course' %></strong>
       by <%= o.teacher && o.teacher.name ? (o.teacher.name.first || o.teacher.name.last) : 'Teacher' %>
@@ -22,12 +24,3 @@
     </li>
   <% }) %>
 </ul>
-
-<script>
-  document.getElementById('termSelect')?.addEventListener('change', function () {
-    const val = this.value;
-    const url = new URL(window.location.href);
-    if (val) url.searchParams.set('term', val); else url.searchParams.delete('term');
-    window.location.href = url.toString();
-  });
-</script>
