@@ -50,8 +50,14 @@ document.addEventListener('submit', async (e) => {
   if (form.action.includes('/api/auth/login') && data && data.success && data.data && data.data.token) {
     localStorage.setItem('token', data.data.token);
     try { localStorage.setItem('user', JSON.stringify(data.data.user || {})); } catch (e) {}
-    // reload the page so server-rendered UI can update (or update header via JS)
-    window.location.reload();
+    // redirect to next (if provided) or to ratings page so user lands on the expected area
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get('next');
+      window.location.href = next || '/ratings';
+    } catch (e) {
+      window.location.href = '/ratings';
+    }
   }
 });
 

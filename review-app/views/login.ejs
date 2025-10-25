@@ -21,9 +21,14 @@ if (form) {
       if (r.ok && json && json.success) {
         // store token
         if (json.data && json.data.token) localStorage.setItem('token', json.data.token);
-        // do not force redirect to complete-profile on first login; send user to home instead.
-        // If you want to require profile completion, handle that server-side or show an in-app notice here.
-        window.location = '/';
+        // redirect student to ratings page (or next if provided)
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const next = params.get('next');
+          window.location = next || '/ratings';
+        } catch (e) {
+          window.location = '/ratings';
+        }
         return;
       }
       alert((json && json.error && json.error.message) || 'Login failed');

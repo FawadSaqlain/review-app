@@ -6,7 +6,7 @@
     </a>
   </div>
   <nav class="site-nav">
-    <a href="/">Home</a>
+    <a id="homeLink" href="/">Home</a>
   <a id="signupLink" href="/signup">Sign Up</a>
   <a id="loginLink" href="/login">Login</a>
   <!-- Admin link is conditional: defaults to login page; client script will switch to add page when authenticated -->
@@ -39,6 +39,16 @@
 
         const adminToken = localStorage.getItem('adminToken');
         const userToken = localStorage.getItem('token');
+        const homeLink = document.getElementById('homeLink');
+
+        // Hide the Home/cover page link when any user (student or admin) is logged in
+        try {
+          if (adminToken || userToken) {
+            if (homeLink) homeLink.style.display = 'none';
+          } else {
+            if (homeLink) homeLink.style.display = 'inline-block';
+          }
+        } catch (e) { /* ignore */ }
 
         // Admin handling
         const adminUsersLink = document.getElementById('adminUsersLink');
@@ -50,6 +60,8 @@
           adminOfferingsLink.style.display = 'inline-block';
           adminTermsLink.style.display = 'inline-block';
           adminLogout.style.display = 'inline-block';
+          // hide sign up / login when admin is logged in
+          try { loginLink.style.display = 'none'; signupLink.style.display = 'none'; } catch(e) {}
           // show ratings view to admins
           document.getElementById('viewRatingsLink').style.display = 'inline-block';
         } else {
@@ -69,6 +81,16 @@
         if (userToken) {
           loginLink.style.display = 'none';
           signupLink.style.display = 'none';
+          // if a regular user is logged in, hide admin-specific links unless an adminToken is also present
+          try {
+            if (!adminToken) {
+              adminLink.style.display = 'none';
+              adminUsersLink.style.display = 'none';
+              adminOfferingsLink.style.display = 'none';
+              adminTermsLink.style.display = 'none';
+              adminLogout.style.display = 'none';
+            }
+          } catch (e) { /* ignore */ }
           userLink.style.display = 'inline-block';
           const giveReviewLink = document.getElementById('giveReviewLink');
           giveReviewLink.style.display = 'inline-block';
@@ -94,6 +116,11 @@
                   );
               if (needsFetch) {
                 try {
+                  // If an admin token is present or the user object already indicates an admin
+                  // skip fetching /api/auth/me because the profile completion banner is intended for students only.
+                  if (adminToken || (u && u.role === 'admin')) {
+                    return;
+                  }
                   const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
                   const j = await res.json().catch(()=>null);
                   if (j && j.success && j.data && j.data.user) {
@@ -104,6 +131,8 @@
               }
               if (!u) return;
               const showBanner = (() => {
+                // Never show the profile completion banner for admin users
+                if (u && u.role === 'admin') return false;
                 // missing phone
                 if (!u.phone) return true;
                 // missing idCard (server stores file path on user.idCardImage; older names may be idCard/idCardFilename/idCardUrl)
