@@ -93,10 +93,22 @@ async function load(page=1){
         try {
           const r = await fetch('/api/ratings/summary?offering=' + encodeURIComponent(offId));
           const j = await r.json().catch(()=>null);
-          if (j && j.success && j.data && typeof j.data.summary !== 'undefined') {
+          if (j && j.success && j.data) {
             const td = tr.children[3]; // 4th column: Comment summary
-            const summaryHtml = esc(j.data.summary).replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
-            td.innerHTML = summaryHtml;
+            if (j.data.status === 'stored' && typeof j.data.summary !== 'undefined') {
+              const summaryHtml = esc(j.data.summary).replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+              td.innerHTML = summaryHtml;
+            } else if (j.data.status === 'active') {
+              // active term: remove this row from the list so users don't see live/constantly-changing ratings here
+              // Admins will promote the term which will generate stored summaries for past terms.
+              tr.parentNode && tr.parentNode.removeChild(tr);
+              return;
+            } else {
+              // pending or unknown: leave short snippets as-is and optionally indicate pending
+              // Do not trigger runtime summarization here.
+              // Optionally show a small pending marker if desired:
+              // td.innerHTML = td.innerHTML + ' <em style="color:#666">(summary pending)</em>';
+            }
           }
         } catch (e) {
           // leave short comments if fetch fails

@@ -299,7 +299,9 @@ exports.createTerm = async (req, res) => {
 exports.activateTerm = async (req, res) => {
   try {
     const id = req.params.id;
-    const term = await Term.findById(id);
+  const term = await Term.findById(id);
+  // capture currently active term (if any) so we can generate summaries for it after activation
+  const prevActiveTerm = await Term.findOne({ isActive: true }).lean();
     if (!term) return res.status(404).json({ success: false, error: { message: 'Term not found' } });
     // enforce start and end dates before activation
     if (!term.startDate || !term.endDate) return res.status(400).json({ success: false, error: { message: 'Term must have startDate and endDate before activation' } });
@@ -320,6 +322,8 @@ exports.promoteTerm = async (req, res) => {
     const id = req.params.id;
     const { nextStartDate, nextEndDate } = req.body || {};
     const term = await Term.findById(id);
+    // capture currently active term BEFORE we change anything so summaries can be generated for it
+    const prevActiveTerm = await Term.findOne({ isActive: true }).lean();
     if (!term) return res.status(404).json({ success: false, error: { message: 'Term not found' } });
 
     // If the request provided start/end dates (from the UI), persist them first
@@ -346,7 +350,7 @@ exports.promoteTerm = async (req, res) => {
     await term.save();
     await Audit.create({ action: 'term.activate', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: term._id });
 
-    // compute next term name from activated term name
+  // compute next term name from activated term name
     let nextName = null;
     const m = String(term.name).toLowerCase().match(/^(fa|sp)(\d{2})$/);
     if (m) {
@@ -368,6 +372,34 @@ exports.promoteTerm = async (req, res) => {
         createdNext = next;
         await Audit.create({ action: 'term.create', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: next._id });
       }
+    }
+
+    // generate and store comment summaries for the previous term (if any)
+    try {
+      const prevTerm = prevActiveTerm; // captured earlier
+      if (prevTerm && prevTerm._id) {
+        const Rating = require('../models').Rating;
+        const RatingSummary = require('../models').RatingSummary;
+        const Offering = require('../models').Offering;
+        const { summarizeComments } = require('../lib/commentSummarizer');
+
+        const offerings = await Offering.find({ term: prevTerm._id }).select('_id').lean();
+        for (const o of offerings) {
+          try {
+            const ratings = await Rating.find({ offering: o._id }).lean();
+            if (!ratings || ratings.length === 0) continue;
+            const comments = ratings.map(r => r.comment).filter(Boolean);
+            const avgOverall = ratings.reduce((s, r) => s + (r.overallRating || 0), 0) / ratings.length;
+            const avgMarks = ratings.reduce((s, r) => s + (typeof r.obtainedMarks !== 'undefined' && r.obtainedMarks !== null ? r.obtainedMarks : 0), 0) / ratings.length;
+            const summaryObj = summarizeComments(comments, avgOverall || 0, avgMarks || 0);
+            await RatingSummary.findOneAndUpdate({ offering: o._id, term: prevTerm._id }, { summary: summaryObj.summary, avgOverall: summaryObj.avgOverall, avgMarks: summaryObj.avgMarks, count: summaryObj.count }, { upsert: true, new: true });
+          } catch (inner) {
+            console.warn('Could not generate summary for offering', o._id, inner && inner.message);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error generating summaries for previous term', e && e.stack ? e.stack : e);
     }
 
     // If request comes from browser form, redirect back to terms page with success message
@@ -672,6 +704,7 @@ exports.addClassesFromXlsx = async (req, res) => {
   const resolvedTerm = await resolveTermFromRequest(req);
   if (!resolvedTerm) return res.status(400).json({ success: false, error: { code: 'ERR_NO_TERM', message: 'No active term and no term provided' } });
 
+  const seenKeys = new Set(); // in-memory dedupe for rows within the same uploaded file
   for (const r of rows) {
       // attempt to find common header keys
       const code = r.code || r.Code || r['Course Code'] || r['course code'] || r['Code'] || r['code'] || r['course_code'];
@@ -684,6 +717,15 @@ exports.addClassesFromXlsx = async (req, res) => {
 
       const codeNorm = code ? String(code).replace(/\s+/g, '').toUpperCase() : null;
       const teacherNorm = teacherName ? normalizeName(String(teacherName)) : null;
+
+      // in-file dedupe key: courseCode|teacherNormalized|section
+      const fileKey = `${codeNorm || ''}|${teacherNorm || ''}|${(section || '')}`;
+      if (seenKeys.has(fileKey)) {
+        summary.skipped++;
+        summary.details.push({ row: r, reason: 'duplicate in uploaded file' });
+        continue;
+      }
+      seenKeys.add(fileKey);
 
       if (!codeNorm || !teacherNorm) { summary.skipped++; summary.details.push({ row: r, reason: 'missing code or teacher' }); continue; }
 
@@ -707,8 +749,20 @@ exports.addClassesFromXlsx = async (req, res) => {
       if (!existing) {
         const offering = new Offering({ course: course._id, teacher: teacher._id, section: section ? String(section).trim() : undefined, department: department._id, program: program._id, semesterNumber: Number(semesterNumber) });
         offering.term = resolvedTerm._id;
-        await offering.save();
-        summary.createdOfferings++;
+        try {
+          await offering.save();
+          summary.createdOfferings++;
+        } catch (saveErr) {
+          // handle duplicate key errors gracefully during bulk operations
+          if (saveErr && (saveErr.code === 11000 || saveErr.code === 11001)) {
+            summary.skipped++;
+            summary.details.push({ row: r, reason: 'duplicate offering', error: (saveErr.keyValue || saveErr.message) });
+          } else {
+            // record and continue to avoid aborting the entire bulk upload
+            summary.skipped++;
+            summary.details.push({ row: r, reason: 'save error', error: (saveErr && saveErr.message) || String(saveErr) });
+          }
+        }
       }
       summary.details.push({ row: r, courseId: course._id, teacherId: teacher._id });
     }

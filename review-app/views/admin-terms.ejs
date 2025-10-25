@@ -61,10 +61,12 @@
             <% } %>
           </td>
           <td>
-            <!-- Promote form: activate this term and create the next term. The promote form will include start/end inputs when present above. -->
-            <form id="promote-<%= t._id %>" method="post" action="/admin/terms/<%= t._id %>/promote" style="margin:0 0 6px 0; display:flex; gap:8px; align-items:center;">
-              <button type="submit" class="small-btn">Promote & Create Next</button>
-            </form>
+            <!-- Show Promote button only for rows that have date input(s) (i.e. terms missing start or end date) -->
+            <% if (!t.startDate || !t.endDate) { %>
+              <form id="promote-<%= t._id %>" method="post" action="/admin/terms/<%= t._id %>/promote" style="margin:0 0 6px 0; display:flex; gap:8px; align-items:center;">
+                <button type="submit" class="small-btn">Promote & Create Next</button>
+              </form>
+            <% } %>
           </td>
         </tr>
       <% }); %>

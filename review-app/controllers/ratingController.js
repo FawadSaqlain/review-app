@@ -116,6 +116,31 @@ exports.viewForOffering = async (req, res) => {
       const offerings = await Offering.find().populate('course').populate('teacher').limit(200).lean();
       return res.render('ratings-index', { title: 'Ratings', offerings });
     }
+    // load offering to inspect term
+    const offeringDoc = await Offering.findById(offering).populate('term').lean();
+    if (!offeringDoc) return res.status(404).send('Offering not found');
+
+    // if offering belongs to a non-active (previous) term, prefer to show stored summary if available
+    const TermModel = require('../models').Term;
+    const RatingSummary = require('../models').RatingSummary;
+    let termIsActive = false;
+    if (offeringDoc.term && offeringDoc.term._id) {
+      const termDoc = offeringDoc.term;
+      termIsActive = !!termDoc.isActive;
+    } else if (offeringDoc.term) {
+      const tdoc = await TermModel.findById(offeringDoc.term).lean();
+      termIsActive = !!(tdoc && tdoc.isActive);
+    }
+
+    if (!termIsActive) {
+      // try to fetch a pre-generated summary
+      const summary = await RatingSummary.findOne({ offering: offering }).lean();
+      if (summary) {
+        return res.render('rating-list', { title: 'Ratings', ratings: [], summary });
+      }
+      // fall back to listing individual ratings if summary missing
+    }
+
     const ratings = await Rating.find({ offering }).populate('student', 'email name').lean();
     return res.render('rating-list', { title: 'Ratings', ratings });
   } catch (err) {

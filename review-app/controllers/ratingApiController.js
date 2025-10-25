@@ -96,86 +96,47 @@ exports.summary = async (req, res) => {
 
 
 // GET /api/ratings/summary?offering=...
+// NOTE: This endpoint no longer performs on-demand summarization. It will return a stored
+// RatingSummary (generated during admin Promote) when available. If the offering belongs to
+// the active term, the endpoint returns status 'active' (no summary). If the offering is from
+// a past term and no stored summary exists, the endpoint returns status 'pending' (no runtime
+// summarization is performed here).
 exports.summary = async (req, res) => {
   console.log('api.ratings.summary called');
   try {
-    const offering = req.query.offering;
-    if (!offering)
+    const offeringId = req.query.offering;
+    if (!offeringId)
       return res.status(400).json({ success: false, error: { message: 'offering required' } });
 
-    const ratings = await Rating.find({ offering }).select('comment overallRating obtainedMarks').lean();
-    if (!ratings.length)
-      return res.json({ success: true, data: { summary: 'No ratings yet.', avgOverall: 0, avgMarks: 0, count: 0 } });
+    // Load offering and its term to determine active state
+    const Offering = require('../models').Offering;
+    const RatingSummary = require('../models').RatingSummary;
+    const offering = await Offering.findById(offeringId).populate('term').lean();
 
-    const comments = ratings.map(r => r.comment).filter(Boolean).slice(0, 200);
-    const avgOverall = ratings.reduce((s, r) => s + (r.overallRating || 0), 0) / ratings.length;
-    const avgMarks = ratings.reduce((s, r) => s + (r.obtainedMarks || 0), 0) / ratings.length;
+    // If offering not found, return 404
+    if (!offering) return res.status(404).json({ success: false, error: { message: 'Offering not found' } });
 
-    const key = process.env.GEMINI_API_KEY || process.env.GENAI_API_KEY;
+    const term = offering.term;
 
-    // Helper to defensively extract text from a variety of possible SDK responses
-    const extractTextFromResponse = (resp) => {
-      if (!resp) return null;
-      if (typeof resp === 'string') return resp;
-      if (resp.outputText) return resp.outputText;
-      if (resp.text) return typeof resp.text === 'function' ? null : resp.text;
-      if (resp.result) return resp.result;
-      // check common nested shapes
-      if (Array.isArray(resp.outputs) && resp.outputs.length) {
-        return resp.outputs.map(o => o.content && (o.content.text || o.content)).join('\n') || null;
-      }
-      if (Array.isArray(resp.candidates) && resp.candidates.length) {
-        const c = resp.candidates[0];
-        if (c.content && c.content[0] && c.content[0].text) return c.content[0].text;
-        if (c.content && c.content.text) return c.content.text;
-        if (c.text) return c.text;
-      }
-      try { return JSON.stringify(resp).slice(0, 2000); } catch (e) { return null; }
-    };
-
-    if (key) {
-      console.log('GenAI key configured, attempting remote summarization');
-      try {
-        let GoogleGenAI;
-        try {
-          GoogleGenAI = require('@google/genai').GoogleGenAI;
-        } catch (reqErr) {
-          console.warn('GenAI SDK not installed or failed to load:', reqErr && reqErr.message ? reqErr.message : reqErr);
-          GoogleGenAI = null;
-        }
-
-        if (GoogleGenAI) {
-          const ai = new GoogleGenAI({ apiKey: key });
-          const prompt = `Summarize these student comments into a short concise paragraph (3-4 sentences):\n\n${comments.slice(0, 10).join('\n\n')}`;
-          const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-
-          // Try to extract text safely
-          let text = extractTextFromResponse(response);
-          // If response.text is a function (stream-like), try calling it
-          if (!text && response && typeof response.text === 'function') {
-            try { text = await response.text(); } catch (e) { /* ignore */ }
-          }
-
-          if (text) {
-            console.log('GenAI summarization succeeded');
-            return res.json({ success: true, data: { summary: text, avgOverall, avgMarks, count: ratings.length } });
-          }
-          console.warn('GenAI returned no usable text, falling back to local summarizer; response shape:', typeof response, Object.keys(response || {}).slice(0,10));
-        }
-      } catch (e) {
-        console.warn('GenAI summarization failed:', e && e.message ? e.message : e);
-      }
-    } else {
-      console.log('No GenAI/Gemini API key configured; using local summarizer');
+    // If term is present and active, do NOT provide a summary (ratings are live and changing)
+    if (term && term.isActive) {
+      return res.json({ success: true, data: { status: 'active', message: 'Offering belongs to active term; no stored summary.' } });
     }
 
-    const summarizer = require('../lib/commentSummarizer');
-    const result = summarizer.summarizeComments(comments, avgOverall, avgMarks);
-    // return local summary as fallback
-    return res.json({
-      success: true,
-      data: { summary: result.summary, avgOverall, avgMarks, count: ratings.length }
-    });
+    // Try to fetch a stored summary for this offering+term
+    const termId = term ? term._id : null;
+    const stored = await RatingSummary.findOne({ offering: offeringId, term: termId }).lean();
+    if (stored) {
+      return res.json({ success: true, data: { status: 'stored', summary: stored.summary, avgOverall: stored.avgOverall, avgMarks: stored.avgMarks, count: stored.count, updatedAt: stored.updatedAt, createdAt: stored.createdAt } });
+    }
+
+    // No stored summary. Return pending status — do not run heavy summarization here.
+    // Provide lightweight aggregates (counts/averages) for display if useful.
+    const ratings = await Rating.find({ offering: offeringId }).select('overallRating obtainedMarks').lean();
+    const count = ratings.length;
+    const avgOverall = count ? (ratings.reduce((s, r) => s + (r.overallRating || 0), 0) / count) : 0;
+    const avgMarks = count ? (ratings.reduce((s, r) => s + (r.obtainedMarks || 0), 0) / count) : 0;
+    return res.json({ success: true, data: { status: 'pending', message: 'No stored summary', count, avgOverall, avgMarks } });
   } catch (err) {
     console.error('api.ratings.summary', err);
     return res.status(500).json({ success: false, error: { message: 'Server error' } });

@@ -5,34 +5,43 @@
   .rating-stars .empty { color: #ccc; }
 </style>
 <ul>
-  <% ratings.forEach(function(r){ %>
+  <% if (typeof summary !== 'undefined' && summary && summary.summary) { %>
     <li>
-      <!-- Student identity hidden: ratings are anonymous -->
-      <strong>Overall:</strong>
-      <% if (r.overallRating) { %>
-        <span class="rating-stars">
-          <% for (var i=1;i<=5;i++) { %>
-            <span class="<%= i<=r.overallRating ? 'filled' : 'empty' %>">★</span>
-          <% } %>
-        </span>
-        (<%= r.overallRating %>)
-      <% } else { %>
-        N/A
-      <% } %>
-      <br />
-      <% if (typeof r.obtainedMarks !== 'undefined' && r.obtainedMarks !== null) { %>
-        <strong>Obtained Marks:</strong> <%= r.obtainedMarks %>
-        <br />
-      <% } %>
-  <strong>Answers:</strong>
-      <ul>
-        <% (r.answers || []).forEach(function(a){ %>
-          <li><%= a.type %>: <%= a.value %></li>
-        <% }) %>
-      </ul>
-      <strong>Comment:</strong> <%= r.comment %>
-      <br />
-      <em>Submitted: <%= new Date(r.createdAt).toLocaleString() %></em>
+      <strong>Summary (stored):</strong>
+      <p><%= summary.summary %></p>
+      <p><strong>Count:</strong> <%= summary.count %> &nbsp; <strong>Avg overall:</strong> <%= summary.avgOverall ? summary.avgOverall.toFixed(2) : 'N/A' %> &nbsp; <strong>Avg marks:</strong> <%= summary.avgMarks ? summary.avgMarks.toFixed(2) : 'N/A' %></p>
+      <em>Generated: <%= new Date(summary.updatedAt || summary.createdAt).toLocaleString() %></em>
     </li>
-  <% }) %>
+  <% } else { %>
+    <% ratings.forEach(function(r){ %>
+      <li>
+        <!-- Student identity hidden: ratings are anonymous -->
+        <strong>Overall:</strong>
+        <% if (r.overallRating) { %>
+          <span class="rating-stars">
+            <% for (var i=1;i<=5;i++) { %>
+              <span class="<%= i<=r.overallRating ? 'filled' : 'empty' %>">★</span>
+            <% } %>
+          </span>
+          (<%= r.overallRating %>)
+        <% } else { %>
+          N/A
+        <% } %>
+        <br />
+        <% if (typeof r.obtainedMarks !== 'undefined' && r.obtainedMarks !== null) { %>
+          <strong>Obtained Marks:</strong> <%= r.obtainedMarks %>
+          <br />
+        <% } %>
+    <strong>Answers:</strong>
+        <ul>
+          <% (r.answers || []).forEach(function(a){ %>
+            <li><%= a.type %>: <%= a.value %></li>
+          <% }) %>
+        </ul>
+        <strong>Comment:</strong> <%= r.comment %>
+        <br />
+        <em>Submitted: <%= new Date(r.createdAt).toLocaleString() %></em>
+      </li>
+    <% }) %>
+  <% } %>
 </ul>

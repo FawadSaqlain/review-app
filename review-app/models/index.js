@@ -7,6 +7,7 @@ module.exports = {
   Program: require('./program'),
   Question: require('./question'),
   Rating: require('./rating'),
+  RatingSummary: require('./ratingSummary'),
   Term: require('./term'),
   Audit: require('./audit')
   ,VerificationToken: require('./verificationToken')
