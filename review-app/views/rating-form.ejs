@@ -30,9 +30,7 @@
     <label>Comment (optional)</label>
     <textarea name="comment"><%= existing ? existing.comment : '' %></textarea>
   </div>
-  <div>
-    <label><input type="checkbox" name="anonymized" <%= (existing ? (existing.anonymized ? 'checked' : '') : 'checked') %> /> Submit anonymously</label>
-  </div>
+  <!-- Ratings are always anonymous; no checkbox needed -->
   <div>
     <button type="submit">Submit Rating</button>
   </div>
@@ -50,12 +48,11 @@ document.getElementById('ratingForm').addEventListener('submit', async function(
   const answerEls = Array.from(form.querySelectorAll('[data-qid]'));
   const answers = answerEls.map(el => ({ question: el.dataset.qid, type: el.dataset.type, value: el.value })).filter(a => a.value !== undefined && a.value !== null && String(a.value).trim() !== '');
   const comment = form.querySelector('textarea[name="comment"]').value;
-  const anonymized = form.querySelector('input[name="anonymized"]') ? form.querySelector('input[name="anonymized"]').checked : false;
   try {
     const token = localStorage.getItem('token');
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch('/ratings', { method: 'POST', headers, body: JSON.stringify({ offering, answers, comment, anonymized, overallRating: parseInt(overallRating,10), obtainedMarks }) });
+  const res = await fetch('/ratings', { method: 'POST', headers, body: JSON.stringify({ offering, answers, comment, overallRating: parseInt(overallRating,10), obtainedMarks }) });
     const json = await res.json();
     if (json && json.success) {
       alert('Rating submitted');

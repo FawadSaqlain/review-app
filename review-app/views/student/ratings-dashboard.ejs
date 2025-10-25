@@ -6,7 +6,7 @@
 </div>
 <div id="results">
   <table id="ratingsTable" border="1" cellpadding="4">
-    <thead><tr><th>ID</th><th>Overall</th><th>Marks</th><th>Comment</th><th>Submitted</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Offering (Teacher — Course)</th><th>Overall</th><th>Marks</th><th>Comment</th><th>Submitted</th><th>Actions</th></tr></thead>
     <tbody></tbody>
   </table>
 </div>
@@ -20,7 +20,17 @@ async function fetchRatings(q={}){
 
 function renderRow(r){
   const tr = document.createElement('tr');
-  tr.innerHTML = `<td>${r._id}</td><td>${r.overallRating}</td><td>${r.obtainedMarks}</td><td>${r.comment||''}</td><td>${new Date(r.createdAt).toLocaleString()}</td><td><button data-id="${r._id}" class="edit">Edit</button></td>`;
+  let offeringLabel = 'N/A';
+  try {
+    if (r.offering) {
+      const t = r.offering.teacher;
+      const c = r.offering.course;
+      const teacherName = t ? ((t.name && t.name.first) ? (t.name.first + (t.name.last ? ' ' + t.name.last : '')) : (t.email || 'TBD')) : 'TBD';
+      const courseLabel = c ? ((c.code ? c.code + ' - ' : '') + (c.title || '')) : '';
+      offeringLabel = `${teacherName}${courseLabel ? ' — ' + courseLabel : ''}`;
+    }
+  } catch(e) { offeringLabel = 'N/A'; }
+  tr.innerHTML = `<td>${offeringLabel}</td><td>${r.overallRating}</td><td>${r.obtainedMarks}</td><td>${r.comment||''}</td><td>${new Date(r.createdAt).toLocaleString()}</td><td><button data-id="${r._id}" class="edit">Edit</button></td>`;
   return tr;
 }
 
@@ -30,6 +40,8 @@ document.getElementById('apply').addEventListener('click', async ()=>{
   if (search) q.search = search;
   // limit to current user via student param if available in page global 'CURRENT_USER_ID'
   if (window.CURRENT_USER_ID) q.student = window.CURRENT_USER_ID;
+  // only show ratings for offerings in the active term
+  q.termActive = true;
   const json = await fetchRatings(q);
   const tbody = document.querySelector('#ratingsTable tbody'); tbody.innerHTML='';
   if (json && json.success){

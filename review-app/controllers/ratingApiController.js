@@ -6,6 +6,8 @@ exports.list = async (req, res) => {
   try {
     const q = {};
   const { minMarks, minStars, search, sort='createdAt', order='desc', page=1, limit=25, student } = req.query;
+  // optionally filter ratings to only offerings belonging to the active term when requested
+  const termActiveFilter = req.query.termActive || req.query.activeTerm || null; // accept either param name
   if (minMarks) q.obtainedMarks = { $gte: Number(minMarks) };
     if (minStars) q.overallRating = { $gte: Number(minStars) };
   if (student) q.student = student;
@@ -23,6 +25,24 @@ exports.list = async (req, res) => {
     const pg = Math.max(1, Number(page) || 1);
     const lim = Math.min(200, Number(limit) || 25);
     const skip = (pg - 1) * lim;
+    // if caller requested only active-term ratings, resolve offering ids for active term
+    if (termActiveFilter && String(termActiveFilter) === 'true') {
+      try {
+        const Term = require('../models').Term;
+        const Offering = require('../models').Offering;
+        const activeTerm = await Term.findOne({ isActive: true }).select('_id').lean();
+        if (activeTerm && activeTerm._id) {
+          const offeringDocs = await Offering.find({ term: activeTerm._id }).select('_id').lean();
+          const offeringIds = offeringDocs.map(o => o._id);
+          // restrict ratings to those offerings
+          q.offering = offeringIds.length ? { $in: offeringIds } : { $in: [] };
+        } else {
+          // no active term -> no results
+          q.offering = { $in: [] };
+        }
+      } catch (e) { /* ignore filter failures */ }
+    }
+
     const [items, total, agg] = await Promise.all([
       Rating.find(q).populate('student', 'email name').populate({ path: 'offering', populate: [{ path: 'course' }, { path: 'teacher' }] }).sort(sortObj).skip(skip).limit(lim).lean(),
       Rating.countDocuments(q),

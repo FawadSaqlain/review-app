@@ -32,7 +32,7 @@
     <textarea name="comment"><%= rating.comment || '' %></textarea>
   </div>
   <div>
-    <label><input type="checkbox" name="anonymized" <%= rating.anonymized ? 'checked' : '' %> /> Submit anonymously</label>
+    <!-- Ratings are always anonymous; anonymized checkbox removed -->
   </div>
   <div>
     <button type="submit">Save changes</button>
@@ -77,12 +77,11 @@ document.getElementById('editRatingForm').addEventListener('submit', async funct
   const answerEls = Array.from(form.querySelectorAll('[data-qid]'));
   const answers = answerEls.map(el => ({ question: el.dataset.qid, type: el.dataset.type, value: el.value })).filter(a => a.value !== undefined && a.value !== null && String(a.value).trim() !== '');
   const comment = form.querySelector('textarea[name="comment"]').value;
-  const anonymized = form.querySelector('input[name="anonymized"]').checked;
   try {
     const token = localStorage.getItem('token');
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = 'Bearer ' + token;
-    const res = await fetch('/ratings/' + id, { method: 'PUT', headers, body: JSON.stringify({ offering, answers, comment, anonymized, overallRating, obtainedMarks }) });
+    const res = await fetch('/ratings/' + id, { method: 'PUT', headers, body: JSON.stringify({ offering, answers, comment, overallRating, obtainedMarks }) });
     const json = await res.json();
     if (json && json.success) { alert('Updated'); window.location = '/dashboard/ratings'; }
     else { alert('Error: ' + (json && json.error && json.error.message ? json.error.message : 'unknown')); }

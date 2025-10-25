@@ -8,7 +8,7 @@
 </div>
 <div id="results">
   <table id="ratingsTable" border="1" cellpadding="4">
-    <thead><tr><th>ID</th><th>Student</th><th>Overall</th><th>Marks</th><th>Comment</th><th>Anon</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Offering (Teacher — Course)</th><th>Student</th><th>Overall</th><th>Marks</th><th>Comment</th><th>Anon</th><th>Actions</th></tr></thead>
     <tbody></tbody>
   </table>
 </div>
@@ -22,7 +22,18 @@ async function fetchRatings(q={}){
 
 function renderRow(r){
   const tr = document.createElement('tr');
-  tr.innerHTML = `<td>${r._id}</td><td>${r.student ? (r.student.name && r.student.name.first ? r.student.name.first : r.student.email) : 'N/A'}</td><td>${r.overallRating}</td><td>${r.obtainedMarks}</td><td>${r.comment||''}</td><td>${r.anonymized}</td><td><button data-id="${r._id}" class="edit">Edit</button></td>`;
+  // build offering display: Teacher — Course
+  let offeringLabel = 'N/A';
+  try {
+    if (r.offering) {
+      const t = r.offering.teacher;
+      const c = r.offering.course;
+      const teacherName = t ? ((t.name && t.name.first) ? (t.name.first + (t.name.last ? ' ' + t.name.last : '')) : (t.email || 'TBD')) : 'TBD';
+      const courseLabel = c ? ((c.code ? c.code + ' - ' : '') + (c.title || '')) : '';
+      offeringLabel = `${teacherName}${courseLabel ? ' — ' + courseLabel : ''}`;
+    }
+  } catch (e) { offeringLabel = 'N/A'; }
+  tr.innerHTML = `<td>${offeringLabel}</td><td>${r.student ? (r.student.name && r.student.name.first ? r.student.name.first : r.student.email) : 'N/A'}</td><td>${r.overallRating}</td><td>${r.obtainedMarks}</td><td>${r.comment||''}</td><td>${r.anonymized}</td><td><button data-id="${r._id}" class="edit">Edit</button></td>`;
   return tr;
 }
 
@@ -36,6 +47,8 @@ document.getElementById('apply').addEventListener('click', async ()=>{
   if (minStars) q.minStars = minStars;
   if (search) q.search = search;
   if (sort) q.sort = sort;
+  // request only ratings from the active term
+  q.termActive = true;
   const json = await fetchRatings(q);
   const tbody = document.querySelector('#ratingsTable tbody'); tbody.innerHTML='';
   if (json && json.success){
@@ -47,5 +60,9 @@ document.getElementById('apply').addEventListener('click', async ()=>{
       window.location.href = '/ratings/' + id + '/edit';
     }));
   }
+});
+// load initial results on page load
+document.addEventListener('DOMContentLoaded', function(){
+  try { document.getElementById('apply').click(); } catch(e) { /* ignore */ }
 });
 </script>

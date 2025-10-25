@@ -37,6 +37,17 @@ exports.create = async (req, res) => {
     const offeringDoc = await Offering.findById(offering).lean();
     if (!offeringDoc) return res.status(404).json({ success: false, error: { message: 'Offering not found' } });
 
+    // ensure offering's term is active — ratings are only allowed while the term is active
+    try {
+      const Term = require('../models').Term;
+      let termDoc = null;
+      if (offeringDoc.term && typeof offeringDoc.term === 'object' && offeringDoc.term.isActive !== undefined) termDoc = offeringDoc.term;
+      else if (offeringDoc.term) termDoc = await Term.findById(offeringDoc.term).lean();
+      if (termDoc && !termDoc.isActive) {
+        return res.status(403).json({ success: false, error: { message: 'Ratings for this offering are closed (term has been promoted)' } });
+      }
+    } catch (e) { /* ignore term lookup failures */ }
+
     // If the requester is not an admin, enforce that their section and semesterNumber match the offering.
     if (!req.user || req.user.role !== 'admin') {
       // require user to be authenticated student
@@ -61,7 +72,8 @@ exports.create = async (req, res) => {
   if (!or || or < 1 || or > 5) return res.status(400).json({ success: false, error: { message: 'overallRating (1-5) required' } });
   // obtainedMarks required
   if (typeof obtainedMarks === 'undefined' || obtainedMarks === null || obtainedMarks === '') return res.status(400).json({ success: false, error: { message: 'obtainedMarks required' } });
-    const ratingData = { student: req.user._id, offering, overallRating: or, anonymized: !!anonymized };
+  // Ratings are always anonymous in this system — enforce server-side
+  const ratingData = { student: req.user._id, offering, overallRating: or, anonymized: true };
     if (answers && Array.isArray(answers) && answers.length) ratingData.answers = answers;
     if (typeof comment !== 'undefined') ratingData.comment = comment;
     if (typeof obtainedMarks !== 'undefined' && obtainedMarks !== null && obtainedMarks !== '') ratingData.obtainedMarks = Number(obtainedMarks);
@@ -83,11 +95,18 @@ exports.update = async (req, res) => {
     const rating = await Rating.findById(id);
     if (!rating) return res.status(404).json({ success: false, error: { message: 'Rating not found' } });
     if (rating.student.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, error: { message: 'Not allowed' } });
-    if (!canEdit(rating)) return res.status(403).json({ success: false, error: { message: 'Edit window expired' } });
+    // ensure the offering's term is still active — once admin promotes the term, editing is closed
+    try {
+      const offeringDoc = await Offering.findById(rating.offering).populate('term').lean();
+      if (offeringDoc && offeringDoc.term && offeringDoc.term.isActive === false) {
+        return res.status(403).json({ success: false, error: { message: 'Cannot edit rating: term has been promoted and ratings are closed' } });
+      }
+    } catch (e) { /* ignore */ }
     const { answers, comment, anonymized, overallRating, obtainedMarks } = req.body;
     if (answers && Array.isArray(answers)) rating.answers = answers;
     if (typeof comment !== 'undefined') rating.comment = comment;
-    if (typeof anonymized !== 'undefined') rating.anonymized = !!anonymized;
+  // anonymized is always true for this app — do not allow changing
+  rating.anonymized = true;
     if (typeof overallRating !== 'undefined') {
       const or = parseInt(overallRating, 10);
       if (!or || or < 1 || or > 5) return res.status(400).json({ success: false, error: { message: 'overallRating must be 1-5' } });
@@ -233,10 +252,13 @@ exports.renderEditForm = async (req, res) => {
     if (!rating) return res.status(404).send('Rating not found');
     // ensure owner
     if (!req.user || rating.student.toString() !== req.user._id.toString()) return res.status(403).send('Not allowed');
-    // check edit window
-    const sevenDays = 1000 * 60 * 60 * 24 * 7;
-    const created = new Date(rating.createdAt).getTime();
-    if ((Date.now() - created) > sevenDays) return res.status(403).send('Edit window expired');
+    // ensure the offering's term is active — edits are only allowed while the term is active
+    try {
+      const offeringDoc = await Offering.findById(rating.offering).populate('term').lean();
+      if (offeringDoc && offeringDoc.term && offeringDoc.term.isActive === false) {
+        return res.status(403).send('Edit not allowed: term has been promoted and ratings are closed');
+      }
+    } catch (e) { /* ignore */ }
     // load questions for possible answers editing
     const questions = await Question.find().lean();
     return res.render('rating-edit-form', { title: 'Edit Rating', rating, questions });
