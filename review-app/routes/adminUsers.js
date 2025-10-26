@@ -15,7 +15,7 @@ router.post('/new', adminAuth, controller.create);
 router.get('/:id/edit', adminRequire, controller.renderEdit);
 router.post('/:id/edit', adminAuth, controller.update);
 
-// delete
-router.post('/:id/delete', adminAuth, controller.delete);
+// delete (use DELETE method for RESTful semantics)
+router.delete('/:id', adminAuth, controller.delete);
 
 module.exports = router;

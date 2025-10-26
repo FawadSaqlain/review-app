@@ -77,43 +77,6 @@ exports.adminUpdate = async (req, res) => {
     return res.status(500).json({ success: false, error: { message: 'Server error' } });
   }
 };
-/*
-// GET /api/ratings/summary?offering=...
-exports.summary = async (req, res) => {
-  try {
-    const offering = req.query.offering;
-    if (!offering) return res.status(400).json({ success: false, error: { message: 'offering required' } });
-    // gather comments
-    const ratings = await Rating.find({ offering }).select('comment overallRating obtainedMarks').lean();
-    const comments = ratings.map(r => r.comment).filter(Boolean).slice(0, 200);
-    // simple local summary: join top 5 comments or produce basic stats
-    const avgOverall = ratings.length ? (ratings.reduce((s,r)=>s+(r.overallRating||0),0)/ratings.length) : 0;
-    const avgMarks = ratings.length ? (ratings.reduce((s,r)=>s+(r.obtainedMarks||0),0)/ratings.length) : 0;
-    // If a Gemini API key is configured, try using Google GenAI. Otherwise fall back to local summary.
-    const key = process.env.GAMINI_API_KEY || process.env.GENAI_API_KEY;
-    if (key) {
-      try {
-        // lazy-require the SDK; please run `npm install @google/genai` to enable this path
-        const { GoogleGenAI } = require('@google/genai');
-        const ai = new GoogleGenAI({ apiKey: key });
-        const prompt = `Summarize these student comments into a short concise paragraph (3-4 sentences):\n\n${comments.slice(0,10).join('\n\n')}`;
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-        const text = response && (response.text || response.outputText || response.result) ? (response.text || response.outputText || response.result) : null;
-        if (text) return res.json({ success: true, data: { summary: text, avgOverall, avgMarks, count: ratings.length } });
-      } catch (e) {
-        console.warn('GenAI summarization failed, falling back to local summary:', e && e.message ? e.message : e);
-      }
-    }
-    const summarizer = require('../lib/commentSummarizer');
-    const result = summarizer.summarizeComments(comments, avgOverall, avgMarks);
-    return res.json({ success: true, data: { summary: result.summary, avgOverall, avgMarks, count: ratings.length } });
-  } catch (err) {
-    console.error('api.ratings.summary', err);
-    return res.status(500).json({ success: false, error: { message: 'Server error' } });
-  }
-};
-*/
-
 
 // GET /api/ratings/summary?offering=...
 // NOTE: This endpoint no longer performs on-demand summarization. It will return a stored

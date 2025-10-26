@@ -24,6 +24,8 @@ router.post('/terms/:id/edit', adminAuth, timetableController.updateTerm);
 router.get('/offerings', adminRequire, timetableController.listOfferingsByTerm);
 router.get('/offerings/:id/edit', adminRequire, timetableController.renderOfferingEditForm);
 router.post('/offerings/:id/edit', adminAuth, timetableController.updateOffering);
-router.post('/offerings/:id/delete', adminAuth, timetableController.deleteOffering);
+// Replace POST delete with proper DELETE method for RESTful semantics.
+// Keep route protected by adminAuth. Client pages will call DELETE /admin/offerings/:id.
+router.delete('/offerings/:id', adminAuth, timetableController.deleteOffering);
 
 module.exports = router;

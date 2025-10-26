@@ -7,6 +7,29 @@
   <% } %>
 </div>
 
+<% /* Show a 'Complete profile' prompt when the logged-in user is missing required profile fields */ %>
+<%
+  const showCompleteButton = (() => {
+    if (!user) return false;
+    // if profileComplete explicitly set to true, don't show
+    if (user.profileComplete) return false;
+    // required fields: phone, idCardImage; cgpa required when semesterNumber > 1
+    const missingPhone = !user.phone;
+    const missingIdCard = !user.idCardImage;
+    const needsCgpa = user.semesterNumber && user.semesterNumber > 1;
+    const missingCgpa = needsCgpa && (typeof user.cgpa === 'undefined' || user.cgpa === null || user.cgpa === '');
+    return missingPhone || missingIdCard || missingCgpa;
+  })();
+%>
+
+<% if (showCompleteButton) { %>
+  <div style="margin:12px 0; padding:10px; border:1px solid #e0b4b4; background:#fff6f6;">
+    <strong>Your profile is incomplete.</strong>
+    <p style="margin:8px 0 0 0">Please complete your profile (phone, university ID image, and CGPA if applicable) before giving reviews.</p>
+    <p style="margin:8px 0 0 0"><a href="/complete-profile" class="primary">Complete profile</a></p>
+  </div>
+<% } %>
+
 <ul>
   <% 
     const activeTermId = activeTerm ? String(activeTerm._id) : null;

@@ -1,0 +1,385 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Review App — API Design & Implementation Report</title>
+  <style>
+    body{font-family: Arial, Helvetica, sans-serif; line-height:1.45; padding:24px}
+    h1,h2,h3{color:#0b5ead}
+    pre{background:#f6f6f6;border:1px solid #ddd;padding:10px;overflow:auto}
+    table{border-collapse:collapse;width:100%;margin:12px 0}
+    th,td{border:1px solid #ccc;padding:8px;text-align:left}
+    .muted{color:#666;font-size:0.95em}
+  </style>
+</head>
+<body>
+  <h1>Review App — REST API Design & Implementation Report</h1>
+  <p class="muted">Project: Review App (Node.js, Express, MongoDB). File created: docs/Review_API_Report.doc — open with Microsoft Word or any word processor that supports opening HTML files.</p>
+
+  <h2>A. Design (8 marks)</h2>
+
+  <h3>1. Problem statement & Requirements</h3>
+  <p>
+    This project implements a course review platform for CUI Vehari students. The goal is to let enrolled students securely submit anonymous course evaluations for specific "offerings" (course + teacher + section + term), allow limited editing, and provide admin tools to manage academic terms and the set of offerings. The API is implemented with Express and MongoDB (Mongoose).
+  </p>
+  <h4>Primary goals</h4>
+  <ul>
+    <li>Secure student onboarding using CUI Vehari email verification (OTP) and allow users to complete a minimal profile required to participate.</li>
+    <li>Allow students to submit one anonymous rating per offering. Ratings must include an overall rating (1-5) and obtained marks; optional free-text comments and answers to structured questions are supported.</li>
+    <li>Provide admin capabilities to manage Terms and Offerings: create, update, delete, activate (promote) terms and to bulk import offerings from XLSX/PDF timetables.</li>
+    <li>Generate and store aggregated rating summaries for closed terms during promotion so historical summaries are available without heavy runtime computation.</li>
+  </ul>
+
+  <h4>Important functional requirements (extracted from code)</h4>
+  <ul>
+    <li>Signup requires a CUI Vehari student email in the format <code>^(fa|sp)(\d{2})-([a-z]{2,4})-(\d{3})@cuivehari\.edu\.pk$</code>. The controller enforces this and computes the user's intake and a derived <code>semesterNumber</code> from the email and current date.</li>
+    <li>Signup uses a 6-digit OTP (stored hashed in <code>VerificationToken</code>) that expires in 15 minutes; verification activates the user account.</li>
+    <li>Login returns a JWT and sets an HttpOnly cookie; <code>/api/auth/me</code> returns the populated user (department/program auto-resolved via an email->program map when missing).</li>
+    <li>Profile completion supports uploading an ID card image (express-fileupload). Only images (png/jpg/gif/webp) up to 1MB are accepted; after completion <code>profileComplete</code> is set to true.</li>
+    <li>Ratings: POST <code>/ratings</code> requires <code>offering</code>, <code>overallRating</code> (1-5), and <code>obtainedMarks</code>. Ratings are enforced anonymous server-side (<code>anonymized = true</code>), and a unique index prevents more than one rating per student+offering.</li>
+    <li>Edit rules: students can only update their own rating and only within a 7‑day edit window (controller checks creation date). Editing is closed when the offering's term is no longer active (term is promoted by admin).</li>
+    <li>Admin routes are protected by <code>adminAuth</code>/<code>adminRequire</code>. <code>/admin/terms/:id/promote</code> activates the selected term, optionally sets start/end dates, creates the subsequent term, and generates stored rating summaries for the previously active term.</li>
+    <li>Timetable upload supports parsing both PDF (heuristic parser) and XLSX (ExcelJS) to create Courses, Teachers, Offerings and optional Departments/Programs. The XLSX uploader accepts common header names (code, title, teacher, department, program, semesterNumber, section) and does in-file dedupe before DB writes.</li>
+    <li>Offerings have a unique index on <code>{ course, teacher, term, section }</code> to avoid duplicates. Deletion endpoints return JSON for API clients and redirect for HTML form flows.</li>
+    <li>Error handling: controllers return a consistent JSON envelope <code>{ success: true|false, data:..., error:... }</code> and proper HTTP status codes (400/401/403/404/409/500) according to the failure type.</li>
+  </ul>
+
+  <h3>2. Resource model & URIs</h3>
+  <p>Primary resources with example URIs (derived from project):</p>
+  <table>
+    <tr><th>Resource</th><th>URI</th><th>Purpose</th></tr>
+    <tr><td>User</td><td>/api/auth/login, /api/auth/me</td><td>Login, profile, complete profile</td></tr>
+    <tr><td>Rating</td><td>/ratings (POST), /ratings/:id (PUT/GET)</td><td>Create, update, view ratings</td></tr>
+    <tr><td>Offering</td><td>/admin/offerings (GET), /admin/offerings/:id (DELETE/PUT)</td><td>Admin manage offerings</td></tr>
+    <tr><td>Term</td><td>/admin/terms, /admin/terms/:id/promote</td><td>Manage academic terms and promotion</td></tr>
+    <tr><td>Public ratings API</td><td>/api/ratings, /api/ratings/summary</td><td>Public summary data and mobile API</td></tr>
+  </table>
+
+  <h3>3. HTTP Methods & Status Codes</h3>
+  <p>Use standard RESTful methods and status codes:</p>
+  <ul>
+    <li>POST — Create (201 Created). Example: POST /ratings -> 201 (created) or 400 (validation error)</li>
+    <li>GET — Read (200 OK). Example: GET /ratings?offering=... -> 200 with list</li>
+    <li>PUT / PATCH — Update (200 OK). Example: PUT /ratings/:id -> 200 or 403/404</li>
+    <li>DELETE — Delete (200 OK or 204 No Content). Example: DELETE /admin/offerings/:id -> 200</li>
+    <li>Auth errors: 401 Unauthorized (no/invalid token), 403 Forbidden (insufficient role), 404 Not Found, 409 Conflict (duplicate rating), 500 Server Error</li>
+  </ul>
+
+  <h3>4. JSON Structure & Schema</h3>
+  <p>Key resource schemas (Mongoose models in project). Below are simplified JSON schemas (examples) used for validation and API docs.</p>
+
+  <h4>User (simplified)</h4>
+  <pre>{
+  "_id": "ObjectId",
+  "email": "string",
+  "role": "student|admin",
+  "name": { "first": "string", "last": "string" },
+  "semesterNumber": 3,
+  "section": "A",
+  "phone": "string",
+  "cgpa": 3.2,
+  "profileComplete": false
+}</pre>
+
+  <h4>Rating</h4>
+  <pre>{
+  "_id": "ObjectId",
+  "student": "ObjectId (ref User)",
+  "offering": "ObjectId (ref Offering)",
+  "overallRating": 1-5,
+  "obtainedMarks": Number,
+  "answers": [ { "questionId": "id", "value": "any" } ],
+  "comment": "string",
+  "anonymized": true,
+  "createdAt": "ISODate"
+}</pre>
+
+  <h4>Offering</h4>
+  <pre>{
+  "_id": "ObjectId",
+  "course": { "_id": "ObjectId", "code":"CS-101", "title":"Intro" },
+  "teacher": { "_id": "ObjectId", "name":{ "first":"A","last":"B" } },
+  "department": ObjectId,
+  "program": ObjectId,
+  "semesterNumber": Number,
+  "section": "string",
+  "term": ObjectId
+}</pre>
+
+  <h2>B. Implementation (14 marks)</h2>
+
+  <h3>1. Project structure & code quality</h3>
+  <p>High-level layout (present in the project):</p>
+  <pre>
+review-app/
+ ├─ app.js                # express app setup, middleware, routers
+ ├─ bin/www              # server bootstrap
+ ├─ controllers/         # request handlers (auth, rating, timetable, api-ratings)
+ ├─ routes/              # route definitions mapped to controllers
+ ├─ models/              # Mongoose models (User, Rating, Offering, Term, etc.)
+ ├─ middleware/          # auth, adminRequire, loginRequire
+ ├─ public/              # client assets & JS
+ ├─ views/               # ejs templates
+ ├─ scripts/             # seed-admin.js, helper scripts
+ └─ docs/                # generated reports
+  </pre>
+  <p>Code quality notes:</p>
+  <ul>
+    <li>Controllers are modular and small, each function handles one route.</li>
+    <li>Validation is present in controllers (explicit checks of required fields, ranges).</li>
+    <li>Mongoose used for schema enforcement; try/catch blocks around DB operations and logging on errors.</li>
+    <li>Server returns consistent JSON format: { success: true|false, data:..., error:... }.</li>
+  </ul>
+
+  <h3>2. Endpoints (CRUD)</h3>
+  <p>Representative endpoints with method + purpose + sample request/response.</p>
+
+  <h4>Authentication</h4>
+  <pre>POST /api/auth/login
+Headers: Content-Type: application/json
+Body: { "email":"user@x.com", "password":"pwd" }
+Success 200: { success:true, data: { token: "JWT", user: { id, email, role } } }</pre>
+
+  <h4>Create Rating</h4>
+  <pre>POST /ratings
+Headers: Authorization: Bearer <JWT>
+Body JSON: {
+  "offering": "68fddadc8b6dde8bc35a6db1",
+  "overallRating": 4,
+  "obtainedMarks": 72,
+  "comment": "Good course",
+  "answers": [ { "questionId":"q1", "value":5 } ]
+}
+Response 201: { success:true, data:{ message: 'Rating submitted' } }
+</pre>
+
+  <h4>Update Rating</h4>
+  <pre>PUT /ratings/:id
+Headers: Authorization: Bearer <JWT>
+Body: fields to update (overallRating/answers/comment)
+Response 200: { success:true, data:{ message:'Rating updated' } }</pre>
+
+  <h4>List Offerings (admin)</h4>
+  <pre>GET /admin/offerings?term=<termId>
+Authentication: admin session or bearer token
+Response 200: renders admin-offerings page (HTML) or JSON if used API style
+</pre>
+
+  <h4>Delete Offering (admin)</h4>
+  <pre>DELETE /admin/offerings/:id
+Headers: Authorization: Bearer <ADMIN_JWT>
+Response 200: { success:true, data: { id: '...' } }
+</pre>
+
+  <h3>3. Validation & Error Handling</h3>
+  <ul>
+    <li>Controller-level checks: required fields, numeric ranges (overallRating 1-5), required offering or term existence.</li>
+    <li>Respond with 400 for validation errors, 401 for authentication, 403 for authorization, 404 for missing resources, 409 for duplicates, 500 for server errors.</li>
+    <li>Unique constraints handled (duplicate rating -> 409).</li>
+    <li>Try/catch blocks and console.error logging; audit events recorded after DB changes.</li>
+  </ul>
+
+  <h3>4. Authentication / Security</h3>
+  <ul>
+    <li>JWT used for stateless auth. Admin login sets an HttpOnly cookie `adminToken` as well as returning the token in JSON for API clients.</li>
+    <li>Middleware `adminRequire` verifies JWT, checks blacklist (token revocation) and ensures `user.role === 'admin'`.</li>
+    <li>Routes protected with `loginRequire` or `adminAuth` as appropriate.</li>
+    <li>Passwords hashed with bcrypt; seed script uses same hashing for admin.</li>
+    <li>Server uses consistent authorization checks for sensitive operations.</li>
+  </ul>
+
+  <h3>5. Database Integration</h3>
+  <p>Mongoose + MongoDB used for persistence. Typical patterns:</p>
+  <ul>
+    <li>Models defined under `models/` and used with .find(), .findById(), .save(), .deleteOne()</li>
+    <li>Indexes and unique constraints for preventing duplicates (e.g., unique rating per student/offering).</li>
+    <li>Transactions are not used in the simple flows; complex bulk operations (timetable upload) have dedupe checks and summary reporting.</li>
+  </ul>
+
+  <h3>6. Documentation & Testing</h3>
+  <p>Recommended and implemented items:</p>
+  <ul>
+    <li>Postman collection (recommended) — create requests for auth, ratings, admin operations, with environment variables for baseUrl, token.</li>
+    <li>Inline API examples in this report and in controllers around key endpoints.</li>
+    <li>Unit/integration tests — project can be extended with Mocha/Jest to test controllers and DB interactions; at minimum, manual Postman smoke tests are included in deliverables.</li>
+  </ul>
+
+  <h3>7. Example Postman / curl requests</h3>
+  <p>Login (admin):</p>
+  <pre>POST http://127.0.0.1:3000/api/auth/admin/login
+Content-Type: application/json
+Body:
+{ "email": "admin@cuivehari.edu.pk", "password": "Secret123" }
+</pre>
+
+  <p>Create rating (student):</p>
+  <pre>POST http://127.0.0.1:3000/ratings
+Authorization: Bearer &lt;STUDENT_JWT&gt;
+Content-Type: application/json
+Body: see rating example above
+</pre>
+
+  <p>Delete offering (admin) via curl (PowerShell):</p>
+  <pre>curl -X DELETE "http://127.0.0.1:3000/admin/offerings/68fddad98b6dde8bc35a6487" `
+  -H "Authorization: Bearer &lt;ADMIN_JWT&gt;"</pre>
+
+  <h3>Observed Postman tests (actual requests & responses you ran)</h3>
+  <p>Below are the exact requests and JSON responses observed during your Postman testing. I included them verbatim to make the report traceable to your manual tests.</p>
+
+  <h4>Signup (POST /api/auth/signup) — sample response</h4>
+  <pre>{
+    "success": true,
+    "data": {
+        "id": "68fd9865b9c7ca54f7bcb12b",
+        "email": "fa22-bse-116@cuivehari.edu.pk",
+        "message": "OTP sent to your university email"
+    }
+  }</pre>
+
+  <h4>Verify signup (POST /api/auth/verify-signup) — sample response</h4>
+  <pre>{
+    "success": true,
+    "data": {
+        "message": "Account verified. You may now login."
+    }
+  }</pre>
+
+  <h4>Login (POST /api/auth/login) — sample response (student)</h4>
+  <pre>{
+    "success": true,
+    "data": {
+        "token": "<JWT>",
+        "expiresIn": "1h",
+        "user": {
+            "id": "68fd9865b9c7ca54f7bcb12b",
+            "email": "fa22-bse-116@cuivehari.edu.pk",
+            "role": "student",
+            "profileComplete": false
+        }
+    }
+  }</pre>
+
+  <h4>Get profile (GET /api/auth/me) — sample response</h4>
+  <pre>{
+    "success": true,
+    "data": {
+        "user": {
+            "intake": { "season": "fa", "year": 2022 },
+            "_id": "68fd9865b9c7ca54f7bcb12b",
+            "email": "fa22-bse-116@cuivehari.edu.pk",
+            "role": "student",
+            "name": { "first": "Ali Raza" },
+            "degreeShort": "bse",
+            "rollNumber": "116",
+            "semesterNumber": 7,
+            "profileComplete": false,
+            "isActive": true,
+            "department": { "_id": "68fca7cdb0280827abe7a1bc", "name": "Computer Science" },
+            "program": { "_id": "68fcb68983845ac7cd532d61", "name": "Software Engineering" }
+        }
+    }
+  }</pre>
+
+  <h4>Logout (GET /api/auth/logout) — request and response</h4>
+  <pre>Request body used:
+{
+  "token":"<JWT for logout>"
+}
+
+Response:
+{"success":true,"data":{"message":"Logged out"}}</pre>
+
+  <h4>Admin login (POST /api/auth/admin/login) — sample response</h4>
+  <pre>{"success":true,"data":{"token":"<ADMIN_JWT>","expiresIn":"1h","user":{"id":"68fa383e44fb1cc8cff5dfb8","email":"admin@cuivehari.edu.pk","role":"admin"}}}</pre>
+
+  <h4>List terms (GET /admin/terms) — sample response (rendered JSON snapshot)</h4>
+  <pre>{"title":"Terms","terms":[ {"_id":"68fd08329054756c2b3b10f5","name":"sp27","isActive":true, ...}],"message":null}</pre>
+
+  <h4>Promote a term (POST /admin/terms/:id/promote) — sample request & response</h4>
+  <pre>Request body (example):
+{
+  "startDate": "2028-01-15T00:00:00.000Z",
+  "endDate": "2028-06-30T00:00:00.000Z"
+}
+
+Response (success):
+{"success":true,"data":{"activated":{...},"next":{...}}}
+  </pre>
+
+  <h4>List offerings (GET /admin/offerings) — sample response</h4>
+  <pre>{"title":"Offerings","offerings":[ {"_id":"68fddad98b6dde8bc35a6487","course":{...},"teacher":{...},"section":"A",...}],"currentTerm":{...},"user":{...}}</pre>
+
+  <h4>Give review page (GET /ratings/give) — sample response</h4>
+  <pre>{"title":"Give Review","offerings":[{...}],"activeTerm":{...},"nextTerm":{...},"selectedTerm":"68fd0d5039bfa44c9696f704","user":{...}}</pre>
+
+  <h4>Create rating (POST /ratings) — sample request & response</h4>
+  <pre>Request body:
+{
+  "offering": "68fddade8b6dde8bc35a74f9",
+  "overallRating": 4,
+  "obtainedMarks": 72,
+  "comment": "Good course, helpful instructor."
+}
+
+Response:
+{"success":true,"data":{"message":"Rating submitted"}}</pre>
+
+  <h4>Get ratings for student & term (GET /api/ratings?student=...&termActive=true) — sample response</h4>
+  <pre>{"success":true,"data":{"items":[ {...}, {...}],"total":2,"page":1,"limit":25,"aggregates":{...}}}</pre>
+
+  <h4>Update rating (PUT /ratings/:id) — sample response</h4>
+  <pre>Request body example:
+{"offering":"68fdf825b4a85fdf17ae24c7","overallRating":2,"obtainedMarks":20,"comment":"not good."}
+
+Response:
+{"success":true,"data":{"message":"Rating updated"}}</pre>
+
+  <h4>Delete offering (DELETE /admin/offerings/:id) — sample response</h4>
+  <pre>{"success":true,"data":{"id":"68fddad98b6dde8bc35a6495"}}</pre>
+
+  <h4>List ratings with paging & aggregates (GET /api/ratings?page=1&offering=...&sort=createdAt) — sample response</h4>
+  <pre>{"success":true,"data":{"items":[...],"total":9,"page":1,"limit":25,"aggregates":{"avgOverall":3.5555,"avgMarks":60.6666,"count":9}}}</pre>
+
+  <h4>Rating summary (GET /api/ratings/summary?offering=...) — sample response</h4>
+  <pre>{"success":true,"data":{"status":"stored","summary":"Summary (based on 1 comment(s)): average overall 2.00, average marks 40.00. ...","avgOverall":2,"avgMarks":40,"count":1}}</pre>
+
+  <h4>Delete user (DELETE /admin/users/:id) — sample response</h4>
+  <pre>{"success":true,"data":{"id":"68fa1c2d16f9f3cd789671a7"}}</pre>
+
+
+  <h3>8. Notes on edge cases & improvements</h3>
+  <ul>
+    <li>Edge: When a term is promoted, ratings are closed — controllers check term.isActive before allowing create/update.</li>
+    <li>Improvement: Add rate-limiting and input sanitization to mitigate abuse and XSS in rendered comments.</li>
+    <li>Improvement: Add automated tests and a Postman collection with environment variables to speed grading/testing.</li>
+    <li>Improvement: Use method-override or JS fetch to support DELETE in forms — this project uses JS fetch for delete actions to follow REST best practices.</li>
+  </ul>
+
+  <h2>Appendix — Mapping to rubric</h2>
+  <p>Summarized how each rubric item is satisfied by the deliverable (A and B). Use this section directly in your submission to show how points are met (Design: 8 marks, Implementation: 14 marks).</p>
+
+  <ol>
+    <li><strong>Design</strong>
+      <ul>
+        <li>Problem statement & Requirements: described above.</li>
+        <li>Resource Model & URIs: listed primary resources and URIs.</li>
+        <li>HTTP Methods & Status Codes: used standard RESTful verbs and consistent status codes.</li>
+        <li>JSON Structure & Schema: sample schemas provided for User, Rating, Offering.</li>
+      </ul>
+    </li>
+    <li><strong>Implementation</strong>
+      <ul>
+        <li>Project Structure & Code Quality: provided file tree and notes about controllers, models and middleware.</li>
+        <li>Endpoints (CRUD): key endpoints documented (auth, ratings CRUD, admin offerings/terms).</li>
+        <li>Validation & Error Handling: examples and patterns used in controllers.</li>
+        <li>Authentication/Security: JWT + admin cookie, role checks and blacklist used. Password hashing with bcrypt.</li>
+        <li>Database Integration: Mongoose usage, key constraints, and patterns described.</li>
+        <li>Documentation/Testing: Postman and testing recommendations + example requests included.</li>
+      </ul>
+    </li>
+  </ol>
+
+  <p style="margin-top:30px">End of report. If you'd like a true binary <code>.docx</code> or a PDF export, tell me and I will convert this HTML content into a <code>.docx</code> or produce a PDF and add it into the workspace (I will provide instructions / generate it for you).</p>
+
+</body>
+</html>

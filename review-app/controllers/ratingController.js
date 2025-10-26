@@ -191,7 +191,8 @@ exports.renderGiveList = async (req, res) => {
 
       // if we don't have a section for the user, they cannot give reviews for specific sections
       if (!userSection) {
-        return res.render('rating-give-list', { title: 'Give Review', offerings: [] });
+        // Ensure template variables are always present (avoid ReferenceError in EJS)
+        return res.render('rating-give-list', { title: 'Give Review', offerings: [], activeTerm: null, nextTerm: null, selectedTerm: null, user: req.user || null });
       }
 
       // determine term: allow override via ?term=<id>, otherwise use active term
@@ -237,7 +238,8 @@ exports.renderGiveList = async (req, res) => {
       offerings = offerings.filter(o => !existingSet.has(o._id.toString()));
     }
 
-  return res.render('rating-give-list', { title: 'Give Review', offerings, activeTerm: activeTerm || null, nextTerm: nextTerm || null, selectedTerm: termFilter });
+  return res.render('rating-give-list', { title: 'Give Review', offerings, activeTerm: activeTerm || null, nextTerm: nextTerm || null, selectedTerm: termFilter, user: req.user || null });
+  // return res.json({ title: 'Give Review', offerings, activeTerm: activeTerm || null, nextTerm: nextTerm || null, selectedTerm: termFilter, user: req.user || null });
   } catch (err) {
     console.error('renderGiveList error', err);
     return res.status(500).send('Server error');

@@ -163,7 +163,11 @@ exports.delete = async (req, res) => {
     if (!user) return res.status(404).send('User not found');
     await User.deleteOne({ _id: req.params.id });
     await Audit.create({ action: 'admin.user.delete', actor: req.user._id, targetType: 'User', targetId: req.params.id });
-    return res.redirect('/admin/users');
+    // If the request expects HTML (browser form submit), redirect back to listings for UX.
+    const accept = req.headers && req.headers.accept ? req.headers.accept : '';
+    if (accept.indexOf('text/html') !== -1) return res.redirect('/admin/users');
+    // otherwise return JSON for API clients (e.g., fetch or Postman)
+    return res.json({ success: true, data: { id: req.params.id } });
   } catch (err) {
     console.error('adminUsers.delete error', err);
     return res.status(500).send('Server error');

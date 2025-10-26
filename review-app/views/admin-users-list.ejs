@@ -15,11 +15,33 @@
         <td><%= u.isActive ? 'Yes' : 'No' %></td>
         <td>
           <a href="/admin/users/<%= u._id %>/edit">Edit</a>
-          <form style="display:inline" method="post" action="/admin/users/<%= u._id %>/delete" onsubmit="return confirm('Delete user?');">
-            <button type="submit">Delete</button>
-          </form>
+          <!-- Delete using JS fetch(DELETE) to follow REST practice -->
+          <button type="button" class="delete-user" data-id="<%= u._id %>">Delete</button>
         </td>
       </tr>
     <% }) %>
   </tbody>
 </table>
+<script>
+  (function(){
+    document.querySelectorAll('.delete-user').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        if (!confirm('Delete user?')) return;
+        const id = btn.dataset.id;
+        try {
+          const res = await fetch('/admin/users/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+          if (res.ok) {
+            // if HTML page, reload to reflect change
+            window.location.reload();
+            return;
+          }
+          let j = null; try { j = await res.json(); } catch(e){}
+          alert((j && j.error && (j.error.message || j.error)) || 'Delete failed');
+        } catch (err) {
+          console.error('delete user error', err);
+          alert('Delete failed');
+        }
+      });
+    });
+  })();
+</script>

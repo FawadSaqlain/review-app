@@ -39,9 +39,8 @@
           <td><%= o.term && o.term.name ? o.term.name : '—' %></td>
           <td>
             <a href="/admin/offerings/<%= o._id %>/edit">Edit</a>
-            <form style="display:inline" method="post" action="/admin/offerings/<%= o._id %>/delete" onsubmit="return confirm('Delete offering?');">
-              <button type="submit">Delete</button>
-            </form>
+            <!-- Delete using JS fetch(DELETE) to follow REST practice; uses same-origin credentials (session cookie) -->
+            <button type="button" class="delete-offering" data-id="<%= o._id %>">Delete</button>
           </td>
         </tr>
       <% }) %>
@@ -49,3 +48,29 @@
   </table>
 </main>
 <%- include('../partials/footer') %>
+
+    <script>
+      (function(){
+        // Attach delete handlers (confirm then call DELETE endpoint). Uses same-origin credentials so session cookie is sent.
+        document.querySelectorAll('.delete-offering').forEach(function(btn){
+          btn.addEventListener('click', async function(e){
+            try {
+              if (!confirm('Delete offering?')) return;
+              const id = btn.dataset.id;
+              const res = await fetch('/admin/offerings/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+              if (res.ok) {
+                // reload to show updated list
+                window.location.reload();
+                return;
+              }
+              let j = null;
+              try { j = await res.json(); } catch(e){}
+              alert((j && j.error && (j.error.message || j.error)) || 'Delete failed');
+            } catch (err) {
+              console.error('delete offering error', err);
+              alert('Delete failed');
+            }
+          });
+        });
+      })();
+    </script>

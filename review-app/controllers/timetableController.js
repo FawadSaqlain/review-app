@@ -272,6 +272,7 @@ exports.listTerms = async (req, res) => {
     const message = req.query && req.query.message ? req.query.message : null;
     const error = req.query && req.query.error ? req.query.error : null;
     return res.render('admin-terms', { title: 'Terms', terms, message, error });
+    // return res.json({ title: 'Terms', terms, message, error });
   } catch (err) {
     console.error('listTerms error', err);
     return res.status(500).send('Server error');
@@ -560,6 +561,7 @@ exports.listOfferingsByTerm = async (req, res) => {
     const offerings = await Offering.find(filter).populate('course teacher department program term').sort({ 'course.code': 1 }).lean();
     const terms = await Term.find().sort({ startDate: -1 }).lean();
   return res.render('admin/admin-offerings', { title: 'Offerings', offerings, terms, currentTerm: term, user: req.user });
+  // return res.json({ title: 'Offerings', offerings, terms, currentTerm: term, user: req.user });
   } catch (err) {
     console.error('listOfferingsByTerm error', err);
     return res.status(500).send('Server error');
