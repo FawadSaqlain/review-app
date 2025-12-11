@@ -1,4 +1,8 @@
-<%- include('partials/form', { action: '/api/auth/admin/login', fields: [
-  { name: 'email', type: 'email', placeholder: 'Admin email' },
-  { name: 'password', type: 'password', placeholder: 'Password' }
-], submitText: 'Admin Login' }) %>
+<div class="card">
+  <h2><i class="fa-solid fa-user-shield" style="margin-right:8px;color:var(--primary);"></i>Admin login</h2>
+  <p class="muted" style="margin-top:4px;">Secure access to CVUR administration tools.</p>
+  <%- include('partials/form', { action: '/api/auth/admin/login', fields: [
+    { name: 'email', type: 'email', placeholder: 'Admin email' },
+    { name: 'password', type: 'password', placeholder: 'Password' }
+  ], submitText: 'Admin Login' }) %>
+</div>

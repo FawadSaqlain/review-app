@@ -1,4 +1,4 @@
-<div class="profile-grid">
+<div class="card profile-grid">
 	<h2>My Profile</h2>
 	<p><strong>Email:</strong> <%= user.email %></p>
 <p><strong>Name:</strong> <%= user.name && user.name.first ? user.name.first : '' %> <%= user.name && user.name.last ? user.name.last : '' %></p>
@@ -22,4 +22,5 @@
   </div>
 <% } %>
 
-<a href="/">Home</a>
+<p style="margin-top:16px"><a href="/">Home</a></p>
+</div>

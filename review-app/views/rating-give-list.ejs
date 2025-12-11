@@ -1,5 +1,6 @@
+<div class="card">
 <h1>Give Reviews</h1>
-<div>
+<div class="form-row">
   <% if (activeTerm) { %>
     <label>Term: <strong><%= activeTerm.name %> (active)</strong></label>
   <% } else { %>
@@ -23,14 +24,14 @@
 %>
 
 <% if (showCompleteButton) { %>
-  <div style="margin:12px 0; padding:10px; border:1px solid #e0b4b4; background:#fff6f6;">
+  <div style="margin:12px 0; padding:10px; border-radius:10px; border:1px solid #e0b4b4; background:#fff6f6;">
     <strong>Your profile is incomplete.</strong>
     <p style="margin:8px 0 0 0">Please complete your profile (phone, university ID image, and CGPA if applicable) before giving reviews.</p>
     <p style="margin:8px 0 0 0"><a href="/complete-profile" class="primary">Complete profile</a></p>
   </div>
 <% } %>
 
-<ul>
+<ul style="list-style:none;padding-left:0;margin-top:12px">
   <% 
     const activeTermId = activeTerm ? String(activeTerm._id) : null;
     offerings.forEach(function(o){ 
@@ -39,11 +40,12 @@
       if (o && o.term) offeringTermId = String(o.term._id ? o.term._id : o.term);
       if (!activeTermId || !offeringTermId || offeringTermId !== activeTermId) return;
   %>
-    <li>
+    <li style="padding:10px 12px;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:8px;">
       <strong><%= o.course && o.course.title ? o.course.title : 'Course' %></strong>
       by <%= o.teacher && o.teacher.name ? (o.teacher.name.first || o.teacher.name.last) : 'Teacher' %>
       <% if (o.section) { %> (Section <%= o.section %>) <% } %>
-      - <a href="/ratings/form?offering=<%= o._id %>">Give Review</a>
+      &nbsp;—&nbsp; <a href="/ratings/form?offering=<%= o._id %>">Give Review</a>
     </li>
   <% }) %>
 </ul>
+</div>

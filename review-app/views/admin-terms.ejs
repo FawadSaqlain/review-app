@@ -1,79 +1,81 @@
-<h1>Admin — Terms</h1>
-<p>Note: Terms must have Start and End dates before they can be activated. To create new terms, use the admin API or add via the database.</p>
-<hr />
-<h2>Existing Terms</h2>
+<div class="card">
+  <h1><i class="fa-solid fa-calendar-days" style="margin-right:8px;color:var(--primary);"></i>Admin — Terms</h1>
+  <p>Note: Terms must have Start and End dates before they can be activated. To create new terms, use the admin API or add via the database.</p>
+  <h2 style="margin-top:16px;">Existing Terms</h2>
 
-<% if (typeof error !== 'undefined' && error) { %>
-  <div style="background:#f8d7da;color:#842029;padding:10px;border:1px solid #f5c2c7;margin:8px 0;">Error: <%= error %></div>
-<% } %>
-<% if (typeof message !== 'undefined' && message) { %>
-  <div style="background:#d1e7dd;color:#0f5132;padding:10px;border:1px solid #badbcc;margin:8px 0;">Success: <%= message %></div>
-<% } %>
+  <% if (typeof error !== 'undefined' && error) { %>
+    <div class="response" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">Error: <%= error %></div>
+  <% } %>
+  <% if (typeof message !== 'undefined' && message) { %>
+    <div class="response" style="background:#ecfdf3;color:#166534;border:1px solid #bbf7d0;">Success: <%= message %></div>
+  <% } %>
 
-<style>
-  .admin-terms-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  .admin-terms-table th, .admin-terms-table td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: middle; }
-  .admin-terms-table th { background: #f7f7f7; font-weight: 600; }
-  .term-input { width: 140px; box-sizing: border-box; }
-  .term-actions { display: flex; gap: 8px; align-items: center; }
-  .term-actions .small-btn { padding: 6px 10px; font-size: 13px; }
-  .muted { color: #666; font-size: 13px; }
-  @media (max-width: 720px) { .term-input { width: 100px; } .term-actions { flex-direction: column; align-items: stretch; } }
-</style>
+  <style>
+    .admin-terms-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    .admin-terms-table th, .admin-terms-table td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: middle; }
+    .admin-terms-table th { background: #111827; color:#f9fafb; font-weight: 600; }
 
-<table class="admin-terms-table">
-  <thead>
-    <tr>
-      <th style="width:18%">Name</th>
-      <th style="width:20%">Start Date</th>
-      <th style="width:20%">End Date</th>
-      <th style="width:8%">Active</th>
-      <th style="width:34%">Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% if (terms && terms.length) { %>
-      <% terms.forEach(function(t) { %>
-        <tr>
-          <td><strong><%= t.name %></strong>
-            <div class="muted">ID: <%= t._id %></div>
-          </td>
-          <td>
-            <% if (t.startDate) { %>
-              <div><%= t.startDate.toISOString().slice(0,10) %></div>
-            <% } else { %>
-              <!-- input belongs to the promote form via 'form' attribute -->
-              <input class="term-input" type="date" name="startDate" form="promote-<%= t._id %>" />
-            <% } %>
-          </td>
-          <td>
-            <% if (t.endDate) { %>
-              <div><%= t.endDate.toISOString().slice(0,10) %></div>
-            <% } else { %>
-              <input class="term-input" type="date" name="endDate" form="promote-<%= t._id %>" />
-            <% } %>
-          </td>
-          <td style="text-align:center">
-            <% if (t.isActive) { %>
-              <span style="color:green;font-weight:600">Yes</span>
-            <% } else { %>
-              No
-            <% } %>
-          </td>
-          <td>
-            <!-- Show Promote button only for rows that have date input(s) (i.e. terms missing start or end date) -->
-            <% if (!t.startDate || !t.endDate) { %>
-              <form id="promote-<%= t._id %>" method="post" action="/admin/terms/<%= t._id %>/promote" style="margin:0 0 6px 0; display:flex; gap:8px; align-items:center;">
-                <button type="submit" class="small-btn">Promote & Create Next</button>
-              </form>
-            <% } %>
-          </td>
-        </tr>
-      <% }); %>
-    <% } else { %>
-      <tr><td colspan="5">No terms</td></tr>
-    <% } %>
-  </tbody>
-</table>
+    .term-input { width: 140px; box-sizing: border-box; }
+    .term-actions { display: flex; gap: 8px; align-items: center; }
+    .term-actions .small-btn { padding: 6px 10px; font-size: 13px; }
+    .muted { color: #666; font-size: 13px; }
+    @media (max-width: 720px) { .term-input { width: 100px; } .term-actions { flex-direction: column; align-items: stretch; } }
+  </style>
 
-<!-- promoteHandler removed: promote uses a simple POST so cookie-based sessions work without client JS -->
+  <table class="admin-terms-table">
+    <thead>
+      <tr>
+        <th style="width:18%">Name</th>
+        <th style="width:20%">Start Date</th>
+        <th style="width:20%">End Date</th>
+        <th style="width:8%">Active</th>
+        <th style="width:34%">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (terms && terms.length) { %>
+        <% terms.forEach(function(t) { %>
+          <tr>
+            <td><strong><%= t.name %></strong>
+              <div class="muted">ID: <%= t._id %></div>
+            </td>
+            <td>
+              <% if (t.startDate) { %>
+                <div><%= t.startDate.toISOString().slice(0,10) %></div>
+              <% } else { %>
+                <!-- input belongs to the promote form via 'form' attribute -->
+                <input class="term-input" type="date" name="startDate" form="promote-<%= t._id %>" />
+              <% } %>
+            </td>
+            <td>
+              <% if (t.endDate) { %>
+                <div><%= t.endDate.toISOString().slice(0,10) %></div>
+              <% } else { %>
+                <input class="term-input" type="date" name="endDate" form="promote-<%= t._id %>" />
+              <% } %>
+            </td>
+            <td style="text-align:center">
+              <% if (t.isActive) { %>
+                <span style="color:green;font-weight:600">Yes</span>
+              <% } else { %>
+                No
+              <% } %>
+            </td>
+            <td>
+              <!-- Show Promote button only for rows that have date input(s) (i.e. terms missing start or end date) -->
+              <% if (!t.startDate || !t.endDate) { %>
+                <form id="promote-<%= t._id %>" method="post" action="/admin/terms/<%= t._id %>/promote" style="margin:0 0 6px 0; display:flex; gap:8px; align-items:center;">
+                  <button type="submit" class="small-btn">Promote & Create Next</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      <% } else { %>
+        <tr><td colspan="5">No terms</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+
+  <!-- promoteHandler removed: promote uses a simple POST so cookie-based sessions work without client JS -->
+</div>

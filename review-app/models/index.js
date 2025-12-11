@@ -5,7 +5,6 @@ module.exports = {
   Teacher: require('./teacher'),
   Department: require('./department'),
   Program: require('./program'),
-  Question: require('./question'),
   Rating: require('./rating'),
   RatingSummary: require('./ratingSummary'),
   Term: require('./term'),

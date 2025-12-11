@@ -1,6 +1,7 @@
-<h1><%= title %></h1>
+<div class="card">
+<h1><i class="fa-solid fa-user-gear" style="margin-right:8px;color:var(--primary);"></i><%= title %></h1>
 <form method="post" action="<%= user ? ('/admin/users/' + user._id + '/edit') : '/admin/users/new' %>">
-  <div>
+  <div class="form-row">
     <label>Email</label>
     <input name="email" type="email" required value="<%= user ? user.email : '' %>" />
   </div>
@@ -55,7 +56,8 @@
     <label>Active</label>
     <input name="isActive" type="checkbox" value="1" <%= user && user.isActive ? 'checked' : '' %> />
   </div>
-  <div>
+  <div class="form-row">
     <button type="submit">Save</button>
   </div>
 </form>
+</div>

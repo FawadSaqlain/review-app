@@ -1,8 +1,7 @@
-<%- include('../partials/header') %>
-<main class="container">
-  <h1>Edit Offering</h1>
+<div class="card">
+  <h1><i class="fa-solid fa-pen-to-square" style="margin-right:8px;color:var(--primary);"></i>Edit Offering</h1>
   <form method="post" action="/admin/offerings/<%= offering._id %>/edit">
-    <div>
+    <div class="form-row">
       <label>Course Code</label>
       <input readonly value="<%= offering.course && offering.course.code ? offering.course.code : '' %>" />
       <input type="hidden" name="courseId" value="<%= offering.course && offering.course._id ? offering.course._id : '' %>" />
@@ -46,10 +45,9 @@
         <% }) %>
       </select>
     </div>
-    <div>
+    <div class="form-row">
       <button type="submit">Save</button>
       <a href="/admin/offerings">Back to list</a>
     </div>
   </form>
-</main>
-<%- include('../partials/footer') %>
+</div>

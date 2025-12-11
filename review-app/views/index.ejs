@@ -1,11 +1,31 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title><%= title %></title>
-    <link rel='stylesheet' href='/stylesheets/style.css' />
-  </head>
-  <body>
-    <h1><%= title %></h1>
-    <p>Welcome to <%= title %></p>
-  </body>
-</html>
+<div class="container">
+  <div class="card" style="margin-bottom:24px;">
+    <h1 style="font-size:2rem;display:flex;align-items:center;gap:10px;">
+      <span class="brand-logo"><i class="fa-regular fa-eye"></i></span>
+      <span>CVUR Portal</span>
+    </h1>
+    <p class="muted" style="max-width:620px;margin-top:4px;">
+      See clearly, choose wisely. Explore honest course and teacher reviews from COMSATS Vehari students.
+    </p>
+    <div style="margin-top:18px;display:flex;flex-wrap:wrap;gap:12px;">
+      <a href="/signup"><button type="button"><i class="fa-solid fa-user-plus" style="margin-right:6px;"></i>Get started</button></a>
+      <a href="/login"><button type="button" class="secondary"><i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i>Login</button></a>
+      <a href="/ratings" class="links" style="margin-top:0;"><span><i class="fa-solid fa-star" style="margin-right:4px;color:var(--primary);"></i>Browse ratings</span></a>
+    </div>
+  </div>
+
+  <div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;">
+    <div>
+      <h3><i class="fa-solid fa-book-open" style="margin-right:6px;color:var(--primary);"></i>For students</h3>
+      <p class="muted">Compare teachers, understand marking styles, and see course load before you register.</p>
+    </div>
+    <div>
+      <h3><i class="fa-solid fa-chart-line" style="margin-right:6px;color:var(--primary);"></i>Ratings insight</h3>
+      <p class="muted">Aggregate scores and trends help you quickly spot great offerings each term.</p>
+    </div>
+    <div>
+      <h3><i class="fa-solid fa-shield-halved" style="margin-right:6px;color:var(--primary);"></i>Anon & safe</h3>
+      <p class="muted">Reviews are tied to your account but shown anonymously where needed.</p>
+    </div>
+  </div>
+</div>

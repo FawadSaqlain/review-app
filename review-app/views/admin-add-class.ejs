@@ -1,16 +1,17 @@
-<h1>Admin — Add Class Manually</h1>
+<div class="card">
+<h1><i class="fa-solid fa-chalkboard-user" style="margin-right:8px;color:var(--primary);"></i>Admin — Add Class Manually</h1>
 <form id="addClassForm" method="post" action="/admin/class/add">
   <!-- <div>
     <label for="code">Course Code</label>
     <input id="code" name="code" required />
   </div> -->
-  <div>
+  <div class="form-row">
     <label for="department">Department</label>
     <select id="department" name="department" required>
       <option value="">-- Select Department --</option>
     </select>
   </div>
-  <div>
+  <div class="form-row">
     <label for="term">Term</label>
     <select id="term" name="term">
       <option value="">-- Use active term --</option>
@@ -21,17 +22,17 @@
       <% } %>
     </select>
   </div>
-  <div>
+  <div class="form-row">
     <label for="program">Program / Degree</label>
     <select id="program" name="program" required>
       <option value="">-- Select Program --</option>
     </select>
   </div>
-  <div>
+  <div class="form-row">
     <label for="semesterNumber">Semester Number</label>
     <input id="semesterNumber" name="semesterNumber" type="number" min="1" max="12" required />
   </div>
-  <div>
+  <div class="form-row">
     <label for="section">Section (optional)</label>
     <input id="section" name="section" />
   </div>
@@ -45,20 +46,32 @@
   </div>
   <div>
     <button type="submit">Add Class(es)</button>
-  </div>
-</form>
 
   <hr />
   <h3>Or upload .xlsx (bulk)</h3>
-  <form id="uploadForm" method="post" action="/admin/class/upload" enctype="multipart/form-data">
-    <div>
-      <label for="file">Choose .xlsx file</label>
-      <input id="file" name="file" type="file" accept=".xlsx,.xls" required />
-    </div>
-    <div>
-      <label for="uploadTerm">Term (optional)</label>
-      <select id="uploadTerm" name="term">
-        <option value="">-- Use active term --</option>
+  <div class="card">
+    <form id="uploadForm" method="post" action="/admin/class/upload" enctype="multipart/form-data">
+      <div class="form-row">
+        <label for="file">Choose .xlsx file</label>
+        <input id="file" name="file" type="file" accept=".xlsx,.xls" required />
+      </div>
+      <div class="form-row">
+        <label for="uploadTerm">Term (optional)</label>
+        <select id="uploadTerm" name="term">
+          <option value="">-- Use active term --</option>
+          <% if (terms && terms.length) { %>
+            <% terms.forEach(function(t) { %>
+              <option value="<%= t._id %>" <%= t.isActive ? 'selected' : '' %>><%= t.name %> <%= t.isActive ? '(active)' : '' %></option>
+            <% }); %>
+          <% } %>
+        </select>
+      </div>
+      <div class="form-row">
+        <button type="submit">Upload and Add Classes</button>
+      </div>
+      <div id="uploadResult" class="response"></div>
+    </form>
+  </div>
         <% if (terms && terms.length) { %>
           <% terms.forEach(function(t) { %>
             <option value="<%= t._id %>" <%= t.isActive ? 'selected' : '' %>><%= t.name %> <%= t.isActive ? '(active)' : '' %></option>
@@ -66,11 +79,12 @@
         <% } %>
       </select>
     </div>
-    <div>
+    <div class="form-row">
       <button type="submit">Upload and Add Classes</button>
     </div>
-    <div id="uploadResult" style="margin-top:8px; color:green;"></div>
+    <div id="uploadResult" class="response"></div>
   </form>
+</div>
 
 
 <script>

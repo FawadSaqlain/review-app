@@ -1,11 +1,12 @@
-<h1>My Ratings</h1>
+<div class="card">
+<h1><i class="fa-solid fa-star-half-stroke" style="margin-right:8px;color:var(--primary);"></i>My Ratings</h1>
 <script>window.CURRENT_USER_ID = "<%= typeof currentUserId !== 'undefined' && currentUserId ? currentUserId : '' %>";</script>
-<div>
-  <label>Search: <input id="search" type="text" placeholder="comment or course/teacher" /></label>
+<div class="filters" style="margin-top:8px;">
+  <label>Search<br/><input id="search" type="text" placeholder="comment or course/teacher" /></label>
   <button id="apply">Apply</button>
 </div>
 <div id="results">
-  <table id="ratingsTable" border="1" cellpadding="4">
+  <table id="ratingsTable" class="table">
     <thead><tr><th>Offering (Teacher — Course)</th><th>Overall</th><th>Marks</th><th>Comment</th><th>Submitted</th><th>Actions</th></tr></thead>
     <tbody></tbody>
   </table>

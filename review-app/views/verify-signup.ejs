@@ -1,5 +1,6 @@
 <% var email = typeof email !== 'undefined' ? email : '' %>
-<h2>Verify your account</h2>
+<div class="card">
+<h2><i class="fa-solid fa-envelope-open-text" style="margin-right:8px;color:var(--primary);"></i>Verify your account</h2>
 <p>We've sent an OTP to <strong><%= email %></strong>. Enter it below to verify your account.</p>
 <form id="verifyForm">
   <input type="hidden" id="email" name="email" value="<%= email %>">
@@ -13,6 +14,7 @@
   </div>
   <div id="msg" class="response"></div>
 </form>
+</div>
 
 <script>
 document.getElementById('verifyForm').addEventListener('submit', async function(e){

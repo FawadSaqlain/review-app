@@ -1,23 +1,225 @@
-<h1>Ratings Dashboard (Admin)</h1>
-<div>
-  <label>Min Marks: <input id="minMarks" type="number" min="0" /></label>
-  <label>Min Stars: <input id="minStars" type="number" min="1" max="5" /></label>
-  <label>Search: <input id="search" type="text" placeholder="student email/name or comment" /></label>
-  <label>Sort: <select id="sort"><option value="createdAt">Newest</option><option value="overallRating">Stars</option><option value="obtainedMarks">Marks</option></select></label>
+<div class="card">
+<h1><i class="fa-solid fa-chart-column" style="margin-right:8px;color:var(--primary);"></i>CVUR Analytics Dashboard</h1>
+
+<div id="summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:12px;margin-bottom:12px;"></div>
+
+<div id="trends" style="margin-top:8px;"></div>
+
+<div class="filters" style="margin-top:8px;">
+  <label>Min Marks<br/><input id="minMarks" type="number" min="0" /></label>
+  <label>Min Stars<br/><input id="minStars" type="number" min="1" max="5" /></label>
+  <label>Search<br/><input id="search" type="text" placeholder="student email/name or comment" /></label>
+  <label>Sort<br/><select id="sort"><option value="createdAt">Newest</option><option value="overallRating">Stars</option><option value="obtainedMarks">Marks</option></select></label>
   <button id="apply">Apply</button>
 </div>
-<div id="results">
-  <table id="ratingsTable" border="1" cellpadding="4">
+<div id="results" style="margin-top:12px;">
+  <table id="ratingsTable" class="table">
     <thead><tr><th>Offering (Teacher — Course)</th><th>Student</th><th>Overall</th><th>Marks</th><th>Comment</th><th>Anon</th><th>Actions</th></tr></thead>
     <tbody></tbody>
   </table>
 </div>
+
+<!-- Chart.js for proper axes-based charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 async function fetchRatings(q={}){
   const params = new URLSearchParams(q);
   const res = await fetch('/api/ratings?' + params.toString());
   const json = await res.json();
   return json;
+}
+
+function renderSummary(items, aggregates){
+  const el = document.getElementById('summary');
+  if (!el) return;
+  const total = (aggregates && typeof aggregates.count !== 'undefined') ? aggregates.count : items.length;
+  const avgStars = (aggregates && typeof aggregates.avgOverall !== 'undefined') ? Number(aggregates.avgOverall).toFixed(2) : (total ? (items.reduce((s,r)=>s+(Number(r.overallRating)||0),0)/total).toFixed(2) : '0.00');
+  const avgMarks = (aggregates && typeof aggregates.avgMarks !== 'undefined') ? Number(aggregates.avgMarks).toFixed(1) : (total ? (items.reduce((s,r)=>s+(Number(r.obtainedMarks)||0),0)/total).toFixed(1) : '0.0');
+
+  const byStars = {1:0,2:0,3:0,4:0,5:0};
+  items.forEach(r=>{ const s = Number(r.overallRating)||0; if (s>=1&&s<=5) byStars[s]++; });
+  const maxBucket = Math.max(1,...Object.values(byStars));
+
+  el.innerHTML = `
+    <div class="metric-card">
+      <h3><i class="fa-solid fa-list-check" style="margin-right:6px;color:var(--primary);"></i>Total reviews</h3>
+      <div style="font-size:1.6rem;font-weight:700;">${total}</div>
+    </div>
+    <div class="metric-card">
+      <h3><i class="fa-solid fa-star" style="margin-right:6px;color:var(--primary);"></i>Average rating</h3>
+      <div style="font-size:1.6rem;font-weight:700;">${avgStars}</div>
+      <div class="muted">out of 5</div>
+    </div>
+    <div class="metric-card">
+      <h3><i class="fa-solid fa-clipboard-list" style="margin-right:6px;color:var(--primary);"></i>Average marks</h3>
+      <div style="font-size:1.6rem;font-weight:700;">${avgMarks}</div>
+    </div>
+    <div class="metric-card">
+      <h3><i class="fa-solid fa-chart-simple" style="margin-right:6px;color:var(--primary);"></i>Stars distribution</h3>
+      ${[5,4,3,2,1].map(s=>{
+        const count = byStars[s];
+        const pct = Math.round((count/maxBucket)*100);
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="width:42px;">${s}★</span>
+          <div style="flex:1;height:6px;border-radius:999px;background:#020617;border:1px solid #1f2937;overflow:hidden;">
+            <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#facc15,#fde68a);"></div>
+          </div>
+          <span style="min-width:32px;text-align:right;font-size:0.8rem;">${count}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderTrends(items){
+  const container = document.getElementById('trends');
+  if (!container) return;
+  if (!items || !items.length || !window.Chart) { container.innerHTML = ''; return; }
+
+  const byDay = {};   // key: YYYY-MM-DD -> { total, users:Set }
+  const byMonth = {}; // key: YYYY-MM -> { total, users:Set }
+  const perStarAll = {1:0,2:0,3:0,4:0,5:0};
+  const scatterPoints = [];
+
+  items.forEach(r => {
+    try {
+      const d = r.createdAt ? new Date(r.createdAt) : null;
+      if (!d || isNaN(d.getTime())) return;
+      const dayKey = d.toISOString().slice(0,10);
+      const monthKey = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      const star = Number(r.overallRating) || 0;
+      const marks = typeof r.obtainedMarks !== 'undefined' ? Number(r.obtainedMarks) : null;
+      const userId = r.student && r.student._id ? String(r.student._id) : (r.student && r.student.email) || 'unknown';
+
+      if (!byDay[dayKey]) byDay[dayKey] = { total:0, users:new Set() };
+      if (!byMonth[monthKey]) byMonth[monthKey] = { total:0, users:new Set() };
+
+      byDay[dayKey].total++;
+      byMonth[monthKey].total++;
+      byDay[dayKey].users.add(userId);
+      byMonth[monthKey].users.add(userId);
+
+      if (star>=1 && star<=5) perStarAll[star]++;
+      if (marks !== null && !Number.isNaN(marks) && star>0) scatterPoints.push({ x: marks, y: star });
+    } catch(e) { /* ignore one record */ }
+  });
+
+  const dayEntries = Object.entries(byDay).sort((a,b)=> a[0] < b[0] ? -1 : 1);
+  const monthEntries = Object.entries(byMonth).sort((a,b)=> a[0] < b[0] ? -1 : 1);
+
+  const lastDays = dayEntries.slice(-7);
+  const lastMonths = monthEntries.slice(-6);
+
+  const dayLabels = lastDays.map(([k])=>k);
+  const dayReviews = lastDays.map(([,v])=>v.total);
+  const dayUsers = lastDays.map(([,v])=>v.users.size);
+
+  const monthLabels = lastMonths.map(([k])=>k);
+  const monthReviews = lastMonths.map(([,v])=>v.total);
+
+  const starLabels = ['1★','2★','3★','4★','5★'];
+  const starCounts = [1,2,3,4,5].map(s=>perStarAll[s]||0);
+
+  container.innerHTML = `
+    <div class="card" style="margin-top:10px;">
+      <h3 style="margin-bottom:8px;"><i class="fa-solid fa-chart-area" style="margin-right:6px;color:var(--primary);"></i>Visual trends</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+        <div>
+          <h4 style="font-size:0.9rem;margin-bottom:4px;">Daily reviews (last ${lastDays.length || 0} days)</h4>
+          <canvas id="dailyReviewsChart"></canvas>
+        </div>
+        <div>
+          <h4 style="font-size:0.9rem;margin-bottom:4px;">Monthly reviews</h4>
+          <canvas id="monthlyReviewsChart"></canvas>
+        </div>
+        <div>
+          <h4 style="font-size:0.9rem;margin-bottom:4px;">Star distribution</h4>
+          <canvas id="starDistributionChart"></canvas>
+        </div>
+        <div>
+          <h4 style="font-size:0.9rem;margin-bottom:4px;">Marks vs Stars (scatter)</h4>
+          <canvas id="starsMarksScatterChart"></canvas>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // clean up old charts if any
+  if (!window.cvurCharts) window.cvurCharts = {};
+  Object.values(window.cvurCharts).forEach(ch => { try { ch.destroy(); } catch(e){} });
+  window.cvurCharts = {};
+
+  const dailyCtx = document.getElementById('dailyReviewsChart').getContext('2d');
+  window.cvurCharts.daily = new Chart(dailyCtx, {
+    type: 'bar',
+    data: {
+      labels: dayLabels,
+      datasets: [
+        { label: 'Reviews', data: dayReviews, borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.6)' },
+        { label: 'Active users', data: dayUsers, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.4)', yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      plugins: { legend: { labels:{color:'#e5e7eb', font:{size:10}} } },
+      scales: {
+        x: { ticks:{color:'#9ca3af', autoSkip:true, maxRotation:45, minRotation:45}, grid:{color:'rgba(55,65,81,0.4)'} },
+        y: { position:'left', ticks:{color:'#9ca3af'}, grid:{color:'rgba(55,65,81,0.4)'} },
+        y1:{ position:'right', ticks:{color:'#9ca3af'}, grid:{display:false} }
+      }
+    }
+  });
+
+  const monthlyCtx = document.getElementById('monthlyReviewsChart').getContext('2d');
+  window.cvurCharts.monthly = new Chart(monthlyCtx, {
+    type: 'line',
+    data: {
+      labels: monthLabels,
+      datasets: [
+        { label: 'Reviews per month', data: monthReviews, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.3)', tension:0.3 }
+      ]
+    },
+    options: {
+      plugins: { legend: { labels:{color:'#e5e7eb', font:{size:10}} } },
+      scales: {
+        x: { ticks:{color:'#9ca3af'}, grid:{color:'rgba(55,65,81,0.4)'} },
+        y: { ticks:{color:'#9ca3af'}, grid:{color:'rgba(55,65,81,0.4)'} }
+      }
+    }
+  });
+
+  const starCtx = document.getElementById('starDistributionChart').getContext('2d');
+  window.cvurCharts.stars = new Chart(starCtx, {
+    type: 'pie',
+    data: {
+      labels: starLabels,
+      datasets: [{
+        data: starCounts,
+        backgroundColor: ['#991b1b','#b45309','#eab308','#22c55e','#3b82f6']
+      }]
+    },
+    options:{ plugins:{ legend:{ labels:{color:'#e5e7eb', font:{size:10}} } } }
+  });
+
+  const scatterCtx = document.getElementById('starsMarksScatterChart').getContext('2d');
+  window.cvurCharts.scatter = new Chart(scatterCtx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Review points',
+        data: scatterPoints,
+        backgroundColor: 'rgba(250,204,21,0.7)',
+        borderColor: '#facc15',
+        pointRadius: 3
+      }]
+    },
+    options: {
+      plugins:{ legend:{ labels:{color:'#e5e7eb', font:{size:10}} } },
+      scales: {
+        x: { title:{ display:true, text:'Marks', color:'#e5e7eb' }, ticks:{color:'#9ca3af'}, grid:{color:'rgba(55,65,81,0.4)'} },
+        y: { title:{ display:true, text:'Stars', color:'#e5e7eb' }, min:0, max:5, ticks:{stepSize:1,color:'#9ca3af'}, grid:{color:'rgba(55,65,81,0.4)'} }
+      }
+    }
+  });
 }
 
 function renderRow(r){
@@ -52,7 +254,11 @@ document.getElementById('apply').addEventListener('click', async ()=>{
   const json = await fetchRatings(q);
   const tbody = document.querySelector('#ratingsTable tbody'); tbody.innerHTML='';
   if (json && json.success){
-    json.data.items.forEach(r=> tbody.appendChild(renderRow(r)));
+    const items = json.data.items || [];
+    renderSummary(items);
+    renderTrends(items);
+
+    items.forEach(r=> tbody.appendChild(renderRow(r)));
     // attach edit handlers (navigate to edit form)
     tbody.querySelectorAll('.edit').forEach(btn=> btn.addEventListener('click', (e)=>{
       const id = e.target.dataset.id;
@@ -64,5 +270,11 @@ document.getElementById('apply').addEventListener('click', async ()=>{
 // load initial results on page load
 document.addEventListener('DOMContentLoaded', function(){
   try { document.getElementById('apply').click(); } catch(e) { /* ignore */ }
+  // auto-refresh every 60 seconds so dashboard stays in sync with latest data
+  try {
+    setInterval(function(){
+      try { document.getElementById('apply').click(); } catch(e) { /* ignore */ }
+    }, 60000);
+  } catch(e) { /* ignore */ }
 });
 </script>

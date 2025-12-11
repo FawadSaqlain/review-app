@@ -35,14 +35,14 @@ document.addEventListener('submit', async (e) => {
     localStorage.setItem('adminToken', data.data.token);
     try { localStorage.setItem('user', JSON.stringify(data.data.user || {})); } catch (e) {}
     // redirect to `next` query param if provided (adminRequire appends ?next=...),
-    // otherwise go to admin upload page by default
+    // otherwise go to admin analytics dashboard by default
     try {
       const params = new URLSearchParams(window.location.search);
-  const next = params.get('next');
-  window.location.href = next || '/admin/class/add';
+      const next = params.get('next');
+      window.location.href = next || '/admin/ratings';
     } catch (e) {
       // fallback
-  window.location.href = '/admin/class/add';
+      window.location.href = '/admin/ratings';
     }
   }
 

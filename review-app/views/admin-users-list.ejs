@@ -1,10 +1,12 @@
-<h1>Manage Users</h1>
+<div class="card">
+<h1><i class="fa-solid fa-users-gear" style="margin-right:8px;color:var(--primary);"></i>Manage Users</h1>
+<p class="muted" style="margin-top:4px;">Search, edit, or delete users registered in CVUR.</p>
 <p><a href="/admin/users/new">Create new user</a></p>
-<form method="GET" action="/admin/users">
-  <input name="q" placeholder="Search by email or name" value="<%= q %>" />
+<form method="GET" action="/admin/users" class="filters" style="margin-top:8px;">
+  <label>Search<br/><input name="q" placeholder="Search by email or name" value="<%= q %>" /></label>
   <button type="submit">Search</button>
 </form>
-<table>
+<table class="table" style="margin-top:12px;">
   <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Active</th><th>Actions</th></tr></thead>
   <tbody>
     <% users.forEach(function(u){ %>
@@ -21,7 +23,8 @@
       </tr>
     <% }) %>
   </tbody>
-</table>
+ </table>
+</div>
 <script>
   (function(){
     document.querySelectorAll('.delete-user').forEach(function(btn){

@@ -1,4 +1,4 @@
-const { Rating, Question, Audit, Offering } = require('../models');
+const { Rating, Audit, Offering } = require('../models');
 
 // helper to check edit window (7 days)
 const canEdit = (doc) => {
@@ -14,11 +14,16 @@ exports.renderForm = async (req, res) => {
   try {
     const offeringId = req.query.offering;
     if (!offeringId) return res.status(400).send('offering required');
-    // load questions (simple all questions for now)
-    const questions = await Question.find().lean();
-    // check if user already rated
+    
+    // Check if user already rated this offering
     const existing = await Rating.findOne({ student: req.user._id, offering: offeringId });
-    return res.render('rating-form', { title: 'Rate Course', questions, offeringId, existing });
+    if (existing) {
+      // If already rated, redirect to the ratings dashboard where they can edit their existing ratings
+      return res.redirect('/ratings');
+    }
+    
+    // If not rated yet, show the rating form
+    return res.render('rating-form', { title: 'Rate Course', offeringId, existing: null });
   } catch (err) {
     console.error('renderForm', err);
     return res.status(500).send('Server error');
@@ -28,7 +33,7 @@ exports.renderForm = async (req, res) => {
 // submit a new rating (create)
 exports.create = async (req, res) => {
   try {
-    const { offering, answers, comment, anonymized, overallRating, obtainedMarks } = req.body;
+    const { offering, comment, anonymized, overallRating, obtainedMarks } = req.body;
     if (!offering) return res.status(400).json({ success: false, error: { message: 'offering required' } });
 
     // Authorization: ensure only students who were taught in this offering can submit a review.
@@ -74,7 +79,6 @@ exports.create = async (req, res) => {
   if (typeof obtainedMarks === 'undefined' || obtainedMarks === null || obtainedMarks === '') return res.status(400).json({ success: false, error: { message: 'obtainedMarks required' } });
   // Ratings are always anonymous in this system — enforce server-side
   const ratingData = { student: req.user._id, offering, overallRating: or, anonymized: true };
-    if (answers && Array.isArray(answers) && answers.length) ratingData.answers = answers;
     if (typeof comment !== 'undefined') ratingData.comment = comment;
     if (typeof obtainedMarks !== 'undefined' && obtainedMarks !== null && obtainedMarks !== '') ratingData.obtainedMarks = Number(obtainedMarks);
     const rating = new Rating(ratingData);
@@ -102,8 +106,7 @@ exports.update = async (req, res) => {
         return res.status(403).json({ success: false, error: { message: 'Cannot edit rating: term has been promoted and ratings are closed' } });
       }
     } catch (e) { /* ignore */ }
-    const { answers, comment, anonymized, overallRating, obtainedMarks } = req.body;
-    if (answers && Array.isArray(answers)) rating.answers = answers;
+  const { comment, anonymized, overallRating, obtainedMarks } = req.body;
     if (typeof comment !== 'undefined') rating.comment = comment;
   // anonymized is always true for this app — do not allow changing
   rating.anonymized = true;
@@ -155,37 +158,8 @@ exports.viewForOffering = async (req, res) => {
       // try to fetch a pre-generated summary
       const summary = await RatingSummary.findOne({ offering: offering }).lean();
       if (summary) {
-        return res.render('rating-list', { title: 'Ratings', ratings: [], summary });
+        return res.render('rating-list', { title: 'Ratings', summary });
       }
-      // fall back to listing individual ratings if summary missing
-    }
-
-    const ratings = await Rating.find({ offering }).populate('student', 'email name').lean();
-    return res.render('rating-list', { title: 'Ratings', ratings });
-  } catch (err) {
-    console.error('rating.viewForOffering error', err);
-    return res.status(500).send('Server error');
-  }
-};
-
-// render list of offerings for student to pick and give a rating
-exports.renderGiveList = async (req, res) => {
-  try {
-    // show offerings (populate course and teacher)
-    // Only show offerings the current student is allowed to review.
-    // Admins see all offerings.
-    let filter = {};
-    if (!req.user) {
-      // should be protected by loginRequire, but guard defensively
-      return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
-    }
-
-    // prepare term-related variables in outer scope so both admin and normal users can reference them
-    let activeTerm = null;
-    let nextTerm = null;
-    let termFilter = null;
-
-    if (req.user.role !== 'admin') {
       const userSection = (req.user.section || '').toString().trim();
       const userSem = req.user.semesterNumber;
 
@@ -231,20 +205,140 @@ exports.renderGiveList = async (req, res) => {
     let offerings = await Offering.find(filter).populate('course').populate('teacher').populate('term').limit(200).lean();
 
     // Remove offerings the student has already rated (they can view/edit those on the dashboard)
-    if (req.user && req.user.role !== 'admin' && offerings.length) {
-      const offeringIds = offerings.map(o => o._id);
-      const existingRatings = await Rating.find({ student: req.user._id, offering: { $in: offeringIds } }).select('offering').lean();
-      const existingSet = new Set(existingRatings.map(r => r.offering.toString()));
-      offerings = offerings.filter(o => !existingSet.has(o._id.toString()));
+    const rated = await Rating.find({ 
+      student: req.user._id,
+      offering: { $in: offerings.map(o => o._id) }
+    }).distinct('offering');
+      
+    offerings = offerings.filter(o => !rated.includes(o._id.toString()));
+
+    // Get next term info for display if needed
+    if (!nextTerm && activeTerm) {
+      const nextTermName = activeTerm.name.toLowerCase().startsWith('fa') 
+        ? 'sp' + String(parseInt(activeTerm.name.slice(2)) + 1).padStart(2, '0')
+        : 'fa' + activeTerm.name.slice(2);
+      nextTerm = await Term.findOne({ name: nextTermName }).lean();
     }
 
-  return res.render('rating-give-list', { title: 'Give Review', offerings, activeTerm: activeTerm || null, nextTerm: nextTerm || null, selectedTerm: termFilter, user: req.user || null });
-  // return res.json({ title: 'Give Review', offerings, activeTerm: activeTerm || null, nextTerm: nextTerm || null, selectedTerm: termFilter, user: req.user || null });
+    console.log(`Found ${offerings.length} offerings to rate for user ${req.user._id}`);
+
+    return res.render('rating-give-list', { 
+      title: 'Give Review',
+      offerings,
+      activeTerm: activeTerm || null,
+      nextTerm: nextTerm || null,
+      selectedTerm: termFilter,
+      user: req.user
+    });
   } catch (err) {
     console.error('renderGiveList error', err);
     return res.status(500).send('Server error');
   }
 };
+
+// Export the renderGiveList function
+exports.renderGiveList = async (req, res) => {
+  try {
+    // First check if user has required profile data
+    if (!req.user) {
+      return res.status(401).send('Please log in to give reviews');
+    }
+
+    // Get active term
+    const Term = require('../models').Term;
+    const activeTerm = await Term.findOne({ isActive: true }).lean();
+    if (!activeTerm) {
+      return res.render('rating-give-list', { 
+        title: 'Give Review',
+        offerings: [],
+        activeTerm: null,
+        nextTerm: null,
+        selectedTerm: null,
+        user: req.user,
+        error: 'No active term found'
+      });
+    }
+
+    // Build base query for offerings in active term
+    const filter = {
+      term: activeTerm._id
+    };
+
+    // For regular students (non-admin), filter by their section and semester
+    if (!req.user.role || req.user.role !== 'admin') {
+      const userSection = (req.user.section || '').toString().trim();
+      const userSemester = req.user.semesterNumber;
+
+      // Match either:
+      // 1. Offering matches user's section exactly OR offering has no section requirement
+      // 2. Semester matches OR offering has no semester requirement 
+      filter.$or = [{
+        $and: [
+          { 
+            $or: [
+              { section: userSection },
+              { section: { $exists: false } },
+              { section: null },
+              { section: '' }
+            ]
+          },
+          {
+            $or: [
+              { semesterNumber: userSemester },
+              { semesterNumber: { $exists: false } },
+              { semesterNumber: null }
+            ]
+          }
+        ]
+      }];
+    }
+
+    // Get the list of offerings already rated by this user
+    const ratedOfferings = await Rating.distinct('offering', { 
+      student: req.user._id 
+    });
+
+    // Add the filter to exclude already rated offerings
+    filter._id = { $nin: ratedOfferings };
+
+    // Get all offerings matching the filter
+    let offerings = await Offering.find(filter)
+      .populate({
+        path: 'course',
+        select: 'title code'
+      })
+      .populate({
+        path: 'teacher',
+        select: 'name'
+      })
+      .populate('term')
+      .lean();
+
+    // Offerings are already filtered at the database level
+    // No need for additional filtering here
+
+    // Get next term info for display
+    const nextTerm = await Term.findOne({ 
+      isNext: true
+    }).lean();
+
+    console.log(`Found ${offerings.length} offerings to rate for user ${req.user._id}`);
+
+    return res.render('rating-give-list', { 
+      title: 'Give Review', 
+      offerings,
+      activeTerm: activeTerm,
+      nextTerm: nextTerm, 
+      selectedTerm: activeTerm._id,
+      user: req.user
+    });
+  } catch (err) {
+    console.error('renderGiveList error', err);
+    return res.status(500).send('Server error');
+  }
+};
+
+
 
 // render prefilled edit form for a rating
 exports.renderEditForm = async (req, res) => {
@@ -261,9 +355,7 @@ exports.renderEditForm = async (req, res) => {
         return res.status(403).send('Edit not allowed: term has been promoted and ratings are closed');
       }
     } catch (e) { /* ignore */ }
-    // load questions for possible answers editing
-    const questions = await Question.find().lean();
-    return res.render('rating-edit-form', { title: 'Edit Rating', rating, questions });
+  return res.render('rating-edit-form', { title: 'Edit Rating', rating });
   } catch (err) {
     console.error('renderEditForm', err);
     return res.status(500).send('Server error');

@@ -1,11 +1,15 @@
-<%- include('partials/form', { action: '/api/auth/login', fields: [
-  { name: 'email', type: 'email', placeholder: 'Email' },
-  { name: 'password', type: 'password', placeholder: 'Password' }
-], submitText: 'Login' }) %>
+<div class="card">
+  <h2><i class="fa-solid fa-right-to-bracket" style="margin-right:8px;color:var(--primary);"></i>Login to CVUR</h2>
+  <p class="muted" style="margin-top:4px;">Access course reviews and share your experience.</p>
+  <%- include('partials/form', { action: '/api/auth/login', fields: [
+    { name: 'email', type: 'email', placeholder: 'Email' },
+    { name: 'password', type: 'password', placeholder: 'Password' }
+  ], submitText: 'Login' }) %>
 
 <div class="links">
   <a href="/forgot-password">Forgot password?</a>
   <a href="/signup">Create account</a>
+</div>
 </div>
 
 <script>

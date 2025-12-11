@@ -1,7 +1,6 @@
-<%- include('../partials/header') %>
-<main class="container">
-  <h1>Offerings by Term</h1>
-  <form id="termFilter" method="get" action="/admin/offerings">
+<div class="card">
+  <h1><i class="fa-solid fa-list-check" style="margin-right:8px;color:var(--primary);"></i>Offerings by Term</h1>
+  <form id="termFilter" method="get" action="/admin/offerings" class="filters" style="margin-top:8px;">
     <label for="termSelect">Term:</label>
     <select id="termSelect" name="term">
       <option value="">-- All / Active --</option>
@@ -12,7 +11,7 @@
     <button type="submit">Filter</button>
   </form>
 
-  <table class="table">
+  <table class="table" style="margin-top:12px;">
     <thead>
       <tr>
         <th>Code</th>
@@ -46,8 +45,7 @@
       <% }) %>
     </tbody>
   </table>
-</main>
-<%- include('../partials/footer') %>
+</div>
 
     <script>
       (function(){

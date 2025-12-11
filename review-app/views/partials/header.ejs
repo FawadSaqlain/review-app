@@ -1,8 +1,13 @@
 <header class="site-header">
   <div class="brand">
     <a href="/" class="brand-link">
-      <span class="brand-logo"><i class="fa-solid fa-building-columns"></i></span>
-      <span class="brand-title">COMSATS Review</span>
+      <span class="brand-logo">
+        <i class="fa-regular fa-eye"></i>
+      </span>
+      <div>
+        <span class="brand-title">CVUR Portal</span>
+        <span class="brand-tagline">See clearly, choose wisely</span>
+      </div>
     </a>
   </div>
   <nav class="site-nav">
@@ -11,6 +16,7 @@
   <a id="loginLink" href="/login">Login</a>
   <!-- Admin link is conditional: defaults to login page; client script will switch to add page when authenticated -->
   <a id="adminLink" href="/admin/login">Admin</a>
+  <a id="adminAddClassLink" href="/admin/class/add" style="display:none; margin-left:10px;">Add Class</a>
   <a id="adminUsersLink" href="/admin/users" style="display:none; margin-left:10px;">Manage Users</a>
   <a id="adminOfferingsLink" href="/admin/offerings" style="display:none; margin-left:10px;">Manage Offerings</a>
   <a id="adminTermsLink" href="/admin/terms" style="display:none; margin-left:10px;">Terms</a>
@@ -37,6 +43,7 @@
         const signupLink = el('signupLink');
         const loginLink = el('loginLink');
         const adminLink = el('adminLink');
+        const adminAddClassLink = el('adminAddClassLink');
         const adminUsersLink = el('adminUsersLink');
         const adminOfferingsLink = el('adminOfferingsLink');
         const adminTermsLink = el('adminTermsLink');
@@ -58,11 +65,12 @@
         const role = adminToken ? 'admin' : (userToken ? 'student' : 'anon');
 
         // first hide everything to create a predictable baseline
-        [homeLink, signupLink, loginLink, adminLink, adminUsersLink, adminOfferingsLink, adminTermsLink, adminLogout, userLink, giveReviewLink, viewRatingsLink, myReviewsLink, userDisplay, commonLogout, profileBanner].forEach(x=>{ try{ if(x) x.style.display='none'; }catch(e){} });
+        [homeLink, signupLink, loginLink, adminLink, adminAddClassLink, adminUsersLink, adminOfferingsLink, adminTermsLink, adminLogout, userLink, giveReviewLink, viewRatingsLink, myReviewsLink, userDisplay, commonLogout, profileBanner].forEach(x=>{ try{ if(x) x.style.display='none'; }catch(e){} });
 
         if (role === 'admin') {
           // Admin view
-          if (adminLink) { adminLink.href = '/admin/class/add'; adminLink.textContent = 'Admin • Dashboard'; adminLink.style.display='inline-block'; }
+          if (adminLink) { adminLink.href = '/admin/ratings'; adminLink.textContent = 'Admin • Dashboard'; adminLink.style.display='inline-block'; }
+          if (adminAddClassLink) adminAddClassLink.style.display='inline-block';
           if (adminUsersLink) adminUsersLink.style.display='inline-block';
           if (adminOfferingsLink) adminOfferingsLink.style.display='inline-block';
           if (adminTermsLink) adminTermsLink.style.display='inline-block';

@@ -1,4 +1,3 @@
-const pdfParse = require('pdf-parse');
 const mongoose = require('mongoose');
 const { Course, Teacher, Offering } = require('../models');
 const Audit = require('../models').Audit;
@@ -19,206 +18,26 @@ function escapeRegExp(str) {
   return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Heuristic parser that tries to extract course code, title, teacher from lines
-function parseLinesToEntries(text) {
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const entries = [];
+// PDF timetable parsing removed. Bulk timetable uploads are expected to be
+// Excel (.xlsx/.xls) files and handled by `addClassesFromXlsx` below.
 
-  // Match common code forms: CS-2, CS LAB-1, BCS-FA25-1A, etc.
-  const courseCodeRe = /^([A-Z]{1,5}(?:\sLAB)?[-][A-Z0-9-]+[A-Z0-9]?)$/i;
-  // Teacher line heuristics: starts with Dr. or contains a personal name (2+ words) and optional dept in parentheses
-  const teacherLineRe = /^(Dr\.?\s+|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)(?:\s*\([A-Za-z0-9\- ]+\))?$/;
-  const headerBlacklist = [
-    'COMSATS', 'TIMETABLE', 'BREAK', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY',
-    'SATURDAY', 'SUNDAY', 'CENTRALIZED', 'TIMETABLES', 'BCS', 'CS-5', 'CS-4', 'CS-3', 'CS-2'
-  ];
-
-  function isHeaderLine(l) {
-    const up = l.toUpperCase();
-    for (const h of headerBlacklist) if (up.includes(h)) return true;
-    return false;
-  }
-
-  function isLikelyTeacher(l) {
-    if (!l) return false;
-    if (isHeaderLine(l)) return false;
-    if (/Dr\.?/i.test(l)) return true;
-    // contains two capitalized words (First Last) and not too long
-    const words = l.split(/\s+/).filter(Boolean);
-    if (words.length >= 2 && words.length <= 4) {
-      const capWords = words.filter(w => /^[A-Z][a-z]/.test(w));
-      if (capWords.length >= 2) return true;
-    }
-    // lines like "Name (DEPT)" => likely teacher
-    if (/\([A-Za-z0-9\- ]+\)$/.test(l) && words.length <= 6) return true;
-    return false;
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // detect a line that looks like a course/location/section code
-    const codeMatch = line.match(courseCodeRe);
-    if (codeMatch) {
-      const codeRaw = codeMatch[1];
-      const code = codeRaw.replace(/\s+/g, '').toUpperCase();
-
-      // Collect title lines: look ahead up to 3 lines that are not codes or teacher lines
-      let titleParts = [];
-      let teacher = null;
-      for (let j = i + 1; j <= i + 4 && j < lines.length; j++) {
-        const l = lines[j];
-        // stop if next code encountered
-        if (courseCodeRe.test(l)) break;
-        // if this line looks like a teacher line, capture and stop
-        if (isLikelyTeacher(l) || teacherLineRe.test(l) || /Dr\.?/i.test(l) || /\([A-Za-z]{2,}\)$/.test(l)) {
-          // remove dept parentheses and honorifics, but only if the line looks like a person
-          const cleaned = l.replace(/\([A-Za-z0-9\- ]+\)/, '').replace(/Dr\.?\s*/i, '').trim();
-          teacher = isLikelyTeacher(cleaned) ? normalizeName(cleaned) : null;
-          // advance i so we skip processed lines
-          i = j;
-          break;
-        }
-        // otherwise, assume part of the title
-        titleParts.push(l);
-        i = j; // advance pointer to consume these lines
-      }
-
-      const title = titleParts.join(' ').replace(/\s+/g, ' ').trim();
-      entries.push({ code, title: title || null, teacher: teacher });
-      continue;
-    }
-
-    // Also try to detect inline patterns where code and title on same line (e.g., "CS-2 Programming Fundamentals")
-    const inlineMatch = line.match(/([A-Z]{1,5}(?:\sLAB)?[-][A-Z0-9-]+)\s+(.+)/i);
-    if (inlineMatch) {
-      const code = inlineMatch[1].replace(/\s+/g, '').toUpperCase();
-      const rest = inlineMatch[2].trim();
-      // try to split rest into title and teacher if possible
-      const parts = rest.split(/\s{2,}| - | -|\s\|\s/).map(p => p.trim()).filter(Boolean);
-      let title = parts[0] || null;
-      let teacher = null;
-      if (parts.length > 1) {
-        teacher = normalizeName(parts[parts.length - 1].replace(/Dr\.?\s*/i, ''));
-      } else {
-        // attempt to find teacher pattern inside rest
-        const tmatch = rest.match(teacherLineRe);
-        if (tmatch) teacher = normalizeName(tmatch[0].replace(/Dr\.?\s*/i, ''));
-      }
-      entries.push({ code, title, teacher });
-    }
-  }
-
-  return entries;
-}
-
-// Controller: upload timetable PDF, parse, and upsert DB records
+// Controller: upload timetable — XLSX-only bulk upload handler
+// This endpoint now delegates to addClassesFromXlsx which implements the
+// Excel parsing and DB upsert logic. It will return 400 for non-Excel files.
 exports.uploadTimetable = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ success: false, error: { code: 'ERR_NO_FILE', message: 'PDF file required' } });
-    // no term concept — proceed without requiring termId
+    // accept multer-style req.file or express-fileupload req.files.file
+    const origName = (req.file && req.file.originalname) || (req.files && req.files.file && req.files.file.name) || '';
+    if (!origName) return res.status(400).json({ success: false, error: { code: 'ERR_NO_FILE', message: 'Excel file (.xlsx) required' } });
+    if (!/\.xls(x)?$/i.test(origName)) return res.status(400).json({ success: false, error: { code: 'ERR_INVALID_TYPE', message: 'Only .xlsx/.xls files are accepted' } });
 
-  const data = await pdfParse(req.file.buffer);
-  const text = data && data.text ? data.text : '';
-  // debug: log extracted text length and preview
-  console.log('uploadTimetable: extracted text length=', text.length);
-  if (text.length > 0) console.log('uploadTimetable: preview=', text.slice(0, 1000));
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  console.log('uploadTimetable: extracted lines count=', lines.length);
-  const entries = parseLinesToEntries(text);
-
-  const summary = { createdCourses: 0, createdTeachers: 0, createdOfferings: 0, skipped: 0, details: [] };
-
-    for (const e of entries) {
-      if (!e.code) { summary.skipped++; summary.details.push({ entry: e, reason: 'no code' }); continue; }
-
-      // Upsert course by code
-      let course = await Course.findOne({ code: e.code });
-      if (!course) {
-        course = new Course({ code: e.code, title: e.title || e.code });
-        await course.save();
-        summary.createdCourses++;
-      }
-
-      // Upsert teacher if name present
-      let teacher = null;
-      if (e.teacher) {
-        // match by full name (escape special regex chars coming from parsed text)
-        const parts = String(e.teacher).split(/\s+/).filter(Boolean);
-        const firstPart = parts[0] || '';
-        const lastPart = parts.slice(-1)[0] || '';
-        try {
-          teacher = await Teacher.findOne({
-            'name.first': new RegExp('^' + escapeRegExp(firstPart) + '$', 'i'),
-            'name.last': new RegExp('^' + escapeRegExp(lastPart) + '$', 'i')
-          });
-        } catch (reErr) {
-          // fallback: avoid crashing when RegExp construction somehow fails
-          console.warn('uploadTimetable: RegExp match failed for teacher lookup', e.teacher, reErr && reErr.message);
-          teacher = await Teacher.findOne({ 'name.first': firstPart });
-        }
-        if (!teacher) {
-          const first = parts[0] || '';
-          const last = parts.slice(1).join(' ') || '';
-          teacher = new Teacher({ name: { first, last } });
-          await teacher.save();
-          summary.createdTeachers++;
-        }
-      } else {
-        summary.skipped++; summary.details.push({ entry: e, reason: 'no teacher name' });
-        continue;
-      }
-
-      // Create offering if not exists for course+teacher+term
-      const existing = await Offering.findOne({ course: course._id, teacher: teacher._id, term: term._id });
-      if (!existing) {
-        const offering = new Offering({ course: course._id, teacher: teacher._id, term: term._id });
-        try {
-          await offering.save();
-          summary.createdOfferings++;
-        } catch (saveErr) {
-          // handle duplicate key errors gracefully during bulk operations
-          if (saveErr && (saveErr.code === 11000 || saveErr.code === 11001)) {
-            summary.skipped++;
-            summary.details.push({ entry: e, reason: 'duplicate offering', error: (saveErr.keyValue || saveErr.message) });
-          } else {
-            throw saveErr;
-          }
-        }
-      }
-
-      summary.details.push({ entry: e, courseId: course._id, teacherId: teacher._id });
-    }
-
-    await Audit.create({ action: 'timetable.upload', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: term._id, details: summary });
-
-    // If parser didn't find anything, return debug info so we can inspect the extracted text and lines
-    if (summary.details.length === 0 && summary.createdCourses === 0 && summary.createdTeachers === 0 && summary.createdOfferings === 0) {
-      return res.status(200).json({
-        success: true,
-        data: summary,
-        debug: {
-          extractedTextLength: text.length,
-          extractedTextPreview: text.slice(0, 2000),
-          extractedLinesCount: lines.length,
-          extractedLinesSample: lines.slice(0, 20)
-        }
-      });
-    }
-
-    return res.status(200).json({ success: true, data: summary });
+    // Delegate to existing XLSX handler which supports the same upload formats
+    return await exports.addClassesFromXlsx(req, res);
   } catch (err) {
     console.error('uploadTimetable error', err && err.stack ? err.stack : err);
-    // handle common Mongo duplicate key errors gracefully
-    if (err && err.code === 11000) {
-      const key = err.keyValue ? JSON.stringify(err.keyValue) : 'duplicate key';
-      return res.status(409).json({ success: false, error: { code: 'ERR_DUPLICATE', message: 'Duplicate key error', details: key } });
-    }
-
     const isProd = process.env.NODE_ENV === 'production';
     const payload = { code: 'ERR_INTERNAL', message: isProd ? 'Server error' : (err && err.message) || 'Server error' };
     if (!isProd && err && err.stack) payload.stack = err.stack;
-
     return res.status(500).json({ success: false, error: payload });
   }
 };

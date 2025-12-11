@@ -1,12 +1,13 @@
+<div class="card">
 <h1>Ratings</h1>
 <style>
   .rating-stars { font-size: 18px; }
-  .rating-stars .filled { color: gold; }
-  .rating-stars .empty { color: #ccc; }
+  .rating-stars .filled { color: #fbbf24; }
+  .rating-stars .empty { color: #e5e7eb; }
 </style>
-<ul>
+<ul style="list-style:none;padding-left:0;margin-top:12px">
   <% if (typeof summary !== 'undefined' && summary && summary.summary) { %>
-    <li>
+    <li style="padding:10px 12px;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:8px;">
       <strong>Summary (stored):</strong>
       <p><%= summary.summary %></p>
       <p><strong>Count:</strong> <%= summary.count %> &nbsp; <strong>Avg overall:</strong> <%= summary.avgOverall ? summary.avgOverall.toFixed(2) : 'N/A' %> &nbsp; <strong>Avg marks:</strong> <%= summary.avgMarks ? summary.avgMarks.toFixed(2) : 'N/A' %></p>
@@ -14,7 +15,7 @@
     </li>
   <% } else { %>
     <% ratings.forEach(function(r){ %>
-      <li>
+      <li style="padding:10px 12px;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:8px;">
         <!-- Student identity hidden: ratings are anonymous -->
         <strong>Overall:</strong>
         <% if (r.overallRating) { %>
@@ -32,16 +33,11 @@
           <strong>Obtained Marks:</strong> <%= r.obtainedMarks %>
           <br />
         <% } %>
-    <strong>Answers:</strong>
-        <ul>
-          <% (r.answers || []).forEach(function(a){ %>
-            <li><%= a.type %>: <%= a.value %></li>
-          <% }) %>
-        </ul>
-        <strong>Comment:</strong> <%= r.comment %>
+        <strong>Comment:</strong> <%= r.comment || '—' %>
         <br />
         <em>Submitted: <%= new Date(r.createdAt).toLocaleString() %></em>
       </li>
     <% }) %>
   <% } %>
 </ul>
+</div>

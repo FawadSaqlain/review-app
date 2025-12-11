@@ -1,43 +1,35 @@
-<h1>Edit Rating</h1>
-<form id="editRatingForm" method="post" action="/ratings/<%= rating._id %>?_method=PUT">
-  <input type="hidden" name="offering" value="<%= rating.offering %>" />
-  <div>
-    <label>Overall (1-5) <span style="color:crimson">*</span></label>
-    <div class="star-picker" data-value="<%= rating.overallRating %>">
-      <span class="star" data-value="1">☆</span>
-      <span class="star" data-value="2">☆</span>
-      <span class="star" data-value="3">☆</span>
-      <span class="star" data-value="4">☆</span>
-      <span class="star" data-value="5">☆</span>
+<div class="card">
+  <h1>Edit Rating</h1>
+  <form id="editRatingForm" method="post" action="/ratings/<%= rating._id %>?_method=PUT">
+    <input type="hidden" name="offering" value="<%= rating.offering %>" />
+    <div class="form-row">
+      <label>Overall (1-5) <span style="color:crimson">*</span></label>
+      <div class="star-picker" data-value="<%= rating.overallRating %>">
+        <span class="star" data-value="1">☆</span>
+        <span class="star" data-value="2">☆</span>
+        <span class="star" data-value="3">☆</span>
+        <span class="star" data-value="4">☆</span>
+        <span class="star" data-value="5">☆</span>
+      </div>
+      <input type="hidden" name="overallRating" value="<%= rating.overallRating %>" required />
     </div>
-    <input type="hidden" name="overallRating" value="<%= rating.overallRating %>" required />
-  </div>
-  <div>
-    <label>Obtained Marks</label>
-    <input type="number" name="obtainedMarks" step="0.01" min="0" value="<%= typeof rating.obtainedMarks !== 'undefined' ? rating.obtainedMarks : '' %>" required />
-  </div>
-  <% questions.forEach(function(q){ %>
-    <div>
-      <label><%= q.text %></label>
-      <% var existingAnswer = (rating.answers || []).find(a=> String(a.question) === String(q._id)); %>
-      <% if (q.type === 'numeric') { %>
-        <input name="answers[]" data-qid="<%= q._id %>" data-type="numeric" value="<%= existingAnswer ? existingAnswer.value : '' %>" />
-      <% } else { %>
-        <textarea name="answers[]" data-qid="<%= q._id %>" data-type="text"><%= existingAnswer ? existingAnswer.value : '' %></textarea>
-      <% } %>
+    <div class="form-row">
+      <label>Obtained Marks</label>
+      <input type="number" name="obtainedMarks" step="0.01" min="0" value="<%= typeof rating.obtainedMarks !== 'undefined' ? rating.obtainedMarks : '' %>" required />
     </div>
-  <% }) %>
-  <div>
-    <label>Comment (optional)</label>
-    <textarea name="comment"><%= rating.comment || '' %></textarea>
-  </div>
-  <div>
-    <!-- Ratings are always anonymous; anonymized checkbox removed -->
-  </div>
-  <div>
-    <button type="submit">Save changes</button>
-  </div>
-</form>
+    <div class="form-row">
+      <label>Comment (optional)</label>
+      <textarea name="comment"><%= rating.comment || '' %></textarea>
+    </div>
+    <div class="form-row">
+      <!-- Ratings are always anonymous; anonymized checkbox removed -->
+    </div>
+    <div class="form-row">
+      <button type="submit">Save changes</button>
+    </div>
+  </form>
+</div>
+
 <style>
   .star-picker { font-size: 28px; cursor: pointer; user-select: none; }
   .star-picker .star.filled { color: gold; }
@@ -74,14 +66,12 @@ document.getElementById('editRatingForm').addEventListener('submit', async funct
   const offering = form.querySelector('input[name="offering"]').value;
   const overallRating = parseInt(form.querySelector('input[name="overallRating"]').value,10);
   const obtainedMarks = form.querySelector('input[name="obtainedMarks"]').value;
-  const answerEls = Array.from(form.querySelectorAll('[data-qid]'));
-  const answers = answerEls.map(el => ({ question: el.dataset.qid, type: el.dataset.type, value: el.value })).filter(a => a.value !== undefined && a.value !== null && String(a.value).trim() !== '');
   const comment = form.querySelector('textarea[name="comment"]').value;
   try {
     const token = localStorage.getItem('token');
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = 'Bearer ' + token;
-    const res = await fetch('/ratings/' + id, { method: 'PUT', headers, body: JSON.stringify({ offering, answers, comment, overallRating, obtainedMarks }) });
+    const res = await fetch('/ratings/' + id, { method: 'PUT', headers, body: JSON.stringify({ offering, comment, overallRating, obtainedMarks }) });
     const json = await res.json();
     if (json && json.success) { alert('Updated'); window.location = '/dashboard/ratings'; }
     else { alert('Error: ' + (json && json.error && json.error.message ? json.error.message : 'unknown')); }

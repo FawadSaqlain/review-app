@@ -1,24 +1,24 @@
 <h1>Ratings</h1>
-<div>
-  <label>Offering: <select id="offeringSelect"><option value="">-- all offerings --</option>
+<div class="filters">
+  <label>Offering:<br /><select id="offeringSelect"><option value="">-- all offerings --</option>
     <% offerings.forEach(function(o){ %>
       <option value="<%= o._id %>"><%= o.course && o.course.title ? o.course.title : 'Course' %> by <%= o.teacher && o.teacher.name ? (o.teacher.name.first || o.teacher.name.last) : 'Teacher' %> <%= o.section ? ('(Section ' + o.section + ')') : '' %></option>
     <% }) %>
   </select></label>
-  <label>Min Marks: <input id="minMarks" type="number" min="0" /></label>
-  <label>Min Stars: <input id="minStars" type="number" min="1" max="5" /></label>
-  <label>Search: <input id="search" type="text" placeholder="student/comment" /></label>
-  <label>Sort: <select id="sort"><option value="createdAt">Newest</option><option value="overallRating">Stars</option><option value="obtainedMarks">Marks</option></select></label>
+  <label>Min Marks:<br /><input id="minMarks" type="number" min="0" /></label>
+  <label>Min Stars:<br /><input id="minStars" type="number" min="1" max="5" /></label>
+  <label>Search:<br /><input id="search" type="text" placeholder="student/comment" /></label>
+  <label>Sort:<br /><select id="sort"><option value="createdAt">Newest</option><option value="overallRating">Stars</option><option value="obtainedMarks">Marks</option></select></label>
   <button id="apply">Apply</button>
 </div>
 <div id="aggregates" style="margin-top:8px; font-weight:600;"></div>
-<table id="ratingsTable" border="1" cellpadding="6" style="width:100%; margin-top:12px;">
+<table id="ratingsTable" class="table" style="margin-top:12px;">
   <thead>
     <tr><th>Offering (Teacher — Course)</th><th>Overall (avg)</th><th>Marks (avg)</th><th>Comment summary</th></tr>
   </thead>
   <tbody></tbody>
 </table>
-<div id="pager" style="margin-top:8px;"></div>
+<div id="pager"></div>
 <script>
 async function fetchRatings(q={}){
   const params = new URLSearchParams(q);

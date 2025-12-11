@@ -1,11 +1,6 @@
-const mongoose = require('mongoose');
-const { Schema } = mongoose;
-
-const questionSchema = new Schema({
-  text: { type: String, required: true },
-  type: { type: String, enum: ['numeric', 'text'], default: 'numeric' },
-  required: { type: Boolean, default: true },
-  order: { type: Number, default: 0 }
-}, { timestamps: true });
-
-module.exports = mongoose.model('Question', questionSchema);
+/**
+ * DEPRECATED: Question model removed from app. Kept as a stub so existing
+ * code that may still import it doesn't crash immediately. The app now
+ * uses only overallRating, obtainedMarks and comment on the Rating model.
+ */
+module.exports = null;
