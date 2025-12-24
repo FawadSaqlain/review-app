@@ -23,7 +23,7 @@ exports.renderForm = async (req, res) => {
     }
     
     // If not rated yet, show the rating form
-    return res.render('rating-form', { title: 'Rate Course', offeringId, existing: null });
+    return res.render('student/rating-form', { title: 'Rate Course', offeringId, existing: null });
   } catch (err) {
     console.error('renderForm', err);
     return res.status(500).send('Server error');
@@ -136,7 +136,7 @@ exports.viewForOffering = async (req, res) => {
     if (!offering) {
       // No offering provided: render a table-driven ratings index page (with offerings list for a filter)
       const offerings = await Offering.find().populate('course').populate('teacher').limit(200).lean();
-      return res.render('ratings-index', { title: 'Ratings', offerings });
+      return res.render('student/ratings-index', { title: 'Ratings', offerings });
     }
     // load offering to inspect term
     const offeringDoc = await Offering.findById(offering).populate('term').lean();
@@ -158,7 +158,7 @@ exports.viewForOffering = async (req, res) => {
       // try to fetch a pre-generated summary
       const summary = await RatingSummary.findOne({ offering: offering }).lean();
       if (summary) {
-        return res.render('rating-list', { title: 'Ratings', summary });
+        return res.render('student/rating-list', { title: 'Ratings', summary });
       }
       const userSection = (req.user.section || '').toString().trim();
       const userSem = req.user.semesterNumber;
@@ -166,7 +166,7 @@ exports.viewForOffering = async (req, res) => {
       // if we don't have a section for the user, they cannot give reviews for specific sections
       if (!userSection) {
         // Ensure template variables are always present (avoid ReferenceError in EJS)
-        return res.render('rating-give-list', { title: 'Give Review', offerings: [], activeTerm: null, nextTerm: null, selectedTerm: null, user: req.user || null });
+        return res.render('student/rating-give-list', { title: 'Give Review', offerings: [], activeTerm: null, nextTerm: null, selectedTerm: null, user: req.user || null });
       }
 
       // determine term: allow override via ?term=<id>, otherwise use active term
@@ -222,7 +222,7 @@ exports.viewForOffering = async (req, res) => {
 
     console.log(`Found ${offerings.length} offerings to rate for user ${req.user._id}`);
 
-    return res.render('rating-give-list', { 
+    return res.render('student/rating-give-list', { 
       title: 'Give Review',
       offerings,
       activeTerm: activeTerm || null,
@@ -248,7 +248,7 @@ exports.renderGiveList = async (req, res) => {
     const Term = require('../models').Term;
     const activeTerm = await Term.findOne({ isActive: true }).lean();
     if (!activeTerm) {
-      return res.render('rating-give-list', { 
+      return res.render('student/rating-give-list', { 
         title: 'Give Review',
         offerings: [],
         activeTerm: null,
@@ -324,7 +324,7 @@ exports.renderGiveList = async (req, res) => {
 
     console.log(`Found ${offerings.length} offerings to rate for user ${req.user._id}`);
 
-    return res.render('rating-give-list', { 
+    return res.render('student/rating-give-list', { 
       title: 'Give Review', 
       offerings,
       activeTerm: activeTerm,
@@ -355,7 +355,7 @@ exports.renderEditForm = async (req, res) => {
         return res.status(403).send('Edit not allowed: term has been promoted and ratings are closed');
       }
     } catch (e) { /* ignore */ }
-  return res.render('rating-edit-form', { title: 'Edit Rating', rating });
+  return res.render('student/rating-edit-form', { title: 'Edit Rating', rating });
   } catch (err) {
     console.error('renderEditForm', err);
     return res.status(500).send('Server error');

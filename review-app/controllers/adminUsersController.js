@@ -10,7 +10,7 @@ exports.list = async (req, res) => {
     const filter = q ? { $or: [{ email: new RegExp(q, 'i') }, { 'name.first': new RegExp(q, 'i') }, { 'name.last': new RegExp(q, 'i') }] } : {};
     const total = await User.countDocuments(filter);
     const users = await User.find(filter).sort({ email: 1 }).skip((page - 1) * limit).limit(limit).lean();
-    return res.render('admin-users-list', { title: 'Manage Users', users, page, total, q });
+    return res.render('admin/admin-users-list', { title: 'Manage Users', users, page, total, q });
   } catch (err) {
     console.error('adminUsers.list error', err);
     return res.status(500).send('Server error');
@@ -19,7 +19,7 @@ exports.list = async (req, res) => {
 
 // Render new user form
 exports.renderCreate = async (req, res) => {
-  return res.render('admin-user-form', { title: 'Create User', user: null });
+  return res.render('admin/admin-user-form', { title: 'Create User', user: null });
 };
 
 // helper: parse CUI email like fa22-bse-031@cuivehari.edu.pk
@@ -104,7 +104,7 @@ exports.renderEdit = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).lean();
     if (!user) return res.status(404).send('User not found');
-    return res.render('admin-user-form', { title: 'Edit User', user });
+    return res.render('admin/admin-user-form', { title: 'Edit User', user });
   } catch (err) {
     console.error('adminUsers.renderEdit error', err);
     return res.status(500).send('Server error');

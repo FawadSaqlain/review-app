@@ -76,7 +76,7 @@ exports.renderAddClassForm = async (req, res) => {
       terms = all || [];
     }
 
-    return res.render('admin-add-class', { terms, user: req.user });
+    return res.render('admin/admin-add-class', { terms, user: req.user });
   } catch (err) {
     console.error('renderAddClassForm error', err && err.stack ? err.stack : err);
     return res.status(500).send('Server error');
@@ -90,7 +90,7 @@ exports.listTerms = async (req, res) => {
     // pass optional messages from query string (used after redirects)
     const message = req.query && req.query.message ? req.query.message : null;
     const error = req.query && req.query.error ? req.query.error : null;
-    return res.render('admin-terms', { title: 'Terms', terms, message, error });
+    return res.render('admin/admin-terms', { title: 'Terms', terms, message, error });
     // return res.json({ title: 'Terms', terms, message, error });
   } catch (err) {
     console.error('listTerms error', err);
