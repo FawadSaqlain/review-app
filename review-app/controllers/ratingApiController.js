@@ -5,7 +5,8 @@ const { Rating, User } = require('../models');
 exports.list = async (req, res) => {
   try {
     const q = {};
-  const { minMarks, minStars, search, sort='createdAt', order='desc', page=1, limit=25, student } = req.query;
+
+    const { minMarks, minStars, search, sort='createdAt', order='desc', page=1, limit=25, student } = req.query;
   // optionally filter ratings to only offerings belonging to the active term when requested
   const termActiveFilter = req.query.termActive || req.query.activeTerm || null; // accept either param name
   if (minMarks) q.obtainedMarks = { $gte: Number(minMarks) };
@@ -55,6 +56,103 @@ exports.list = async (req, res) => {
     return res.json({ success: true, data: { items, total, page: pg, limit: lim, aggregates: aggResult } });
   } catch (err) {
     console.error('api.ratings.list', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
+  }
+};
+
+// GET /api/ratings/:id
+// Fetch a single rating (used by student edit page).
+exports.getOne = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const rating = await Rating.findById(id)
+      .populate({ path: 'offering', populate: [{ path: 'course' }, { path: 'teacher' }] })
+      .lean();
+    if (!rating) return res.status(404).json({ success: false, error: { message: 'Not found' } });
+    return res.json({ success: true, data: rating });
+  } catch (err) {
+    console.error('api.ratings.getOne', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
+  }
+};
+
+// GET /api/ratings/give-options
+// Returns the list of offerings the current student can rate in the active term,
+// mirroring the logic from ratingController.renderGiveList but as JSON.
+exports.giveOptions = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: { message: 'Please log in to give reviews' } });
+    }
+
+    const Term = require('../models').Term;
+    const Offering = require('../models').Offering;
+
+    const activeTerm = await Term.findOne({ isActive: true }).lean();
+    if (!activeTerm) {
+      return res.json({
+        success: true,
+        data: {
+          offerings: [],
+          activeTerm: null,
+          nextTerm: null,
+          selectedTerm: null,
+          user: req.user,
+          error: 'No active term found'
+        }
+      });
+    }
+
+    const filter = { term: activeTerm._id };
+
+    if (!req.user.role || req.user.role !== 'admin') {
+      const userSection = (req.user.section || '').toString().trim();
+      const userSemester = req.user.semesterNumber;
+
+      filter.$or = [{
+        $and: [
+          {
+            $or: [
+              { section: userSection },
+              { section: { $exists: false } },
+              { section: null },
+              { section: '' }
+            ]
+          },
+          {
+            $or: [
+              { semesterNumber: userSemester },
+              { semesterNumber: { $exists: false } },
+              { semesterNumber: null }
+            ]
+          }
+        ]
+      }];
+    }
+
+    const ratedOfferings = await Rating.distinct('offering', { student: req.user._id });
+    filter._id = { $nin: ratedOfferings };
+
+    const offerings = await Offering.find(filter)
+      .populate({ path: 'course', select: 'title code' })
+      .populate({ path: 'teacher', select: 'name email' })
+      .populate('term')
+      .lean();
+
+    const nextTerm = await Term.findOne({ isNext: true }).lean();
+
+    return res.json({
+      success: true,
+      data: {
+        offerings,
+        activeTerm,
+        nextTerm,
+        selectedTerm: activeTerm._id,
+        user: req.user
+      }
+    });
+  } catch (err) {
+    console.error('api.ratings.giveOptions', err);
     return res.status(500).json({ success: false, error: { message: 'Server error' } });
   }
 };
@@ -122,6 +220,59 @@ exports.summary = async (req, res) => {
     return res.json({ success: true, data: { status: 'pending', message: 'No stored summary', count, avgOverall, avgMarks } });
   } catch (err) {
     console.error('api.ratings.summary', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
+  }
+};
+
+// GET /api/ratings/summaries
+// Lists stored RatingSummary records for inactive terms only.
+// query: search, page, limit
+exports.listSummaries = async (req, res) => {
+  try {
+    const RatingSummary = require('../models').RatingSummary;
+    const Term = require('../models').Term;
+
+    const { search, page = 1, limit = 25 } = req.query;
+    const pg = Math.max(1, Number(page) || 1);
+    const lim = Math.min(200, Number(limit) || 25);
+
+    const inactiveTermIds = (await Term.find({ isActive: false }).select('_id').lean()).map((t) => t._id);
+
+    const raw = await RatingSummary.find({ term: { $in: inactiveTermIds } })
+      .populate('term', 'name isActive')
+      .populate({
+        path: 'offering',
+        populate: [
+          { path: 'course', select: 'code title name' },
+          { path: 'teacher', select: 'name email' }
+        ]
+      })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean();
+
+    let items = (raw || []).filter((it) => it && it.offering && it.term && it.term.isActive === false);
+
+    if (search) {
+      const s = String(search).toLowerCase().trim();
+      items = items.filter((it) => {
+        const c = it?.offering?.course;
+        const t = it?.offering?.teacher;
+        const termName = it?.term?.name || '';
+        const teacherName = t && t.name ? `${t.name.first || ''} ${t.name.last || ''}`.trim() : (t?.email || '');
+        const courseLabel = c ? `${c.code || ''} ${c.title || c.name || ''}`.trim() : '';
+        const summaryText = it?.summary || '';
+        const hay = `${courseLabel} ${teacherName} ${termName} ${summaryText}`.toLowerCase();
+        return hay.includes(s);
+      });
+    }
+
+    const total = items.length;
+    const start = (pg - 1) * lim;
+    const paged = items.slice(start, start + lim);
+
+    return res.json({ success: true, data: { items: paged, total, page: pg, limit: lim } });
+  } catch (err) {
+    console.error('api.ratings.listSummaries', err);
     return res.status(500).json({ success: false, error: { message: 'Server error' } });
   }
 };

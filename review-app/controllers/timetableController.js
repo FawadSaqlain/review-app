@@ -37,6 +37,33 @@ exports.uploadTimetable = async (req, res) => {
     console.error('uploadTimetable error', err && err.stack ? err.stack : err);
     const isProd = process.env.NODE_ENV === 'production';
     const payload = { code: 'ERR_INTERNAL', message: isProd ? 'Server error' : (err && err.message) || 'Server error' };
+
+async function generateSummariesForTerm(termId) {
+  if (!termId) return;
+  const Rating = require('../models').Rating;
+  const RatingSummary = require('../models').RatingSummary;
+  const Offering = require('../models').Offering;
+  const { summarizeComments } = require('../lib/commentSummarizer');
+
+  const offerings = await Offering.find({ term: termId }).select('_id').lean();
+  for (const o of offerings) {
+    try {
+      const ratings = await Rating.find({ offering: o._id }).lean();
+      if (!ratings || ratings.length === 0) continue;
+      const comments = ratings.map((r) => r.comment).filter(Boolean);
+      const avgOverall = ratings.reduce((s, r) => s + (r.overallRating || 0), 0) / ratings.length;
+      const avgMarks = ratings.reduce((s, r) => s + (typeof r.obtainedMarks !== 'undefined' && r.obtainedMarks !== null ? r.obtainedMarks : 0), 0) / ratings.length;
+      const summaryObj = summarizeComments(comments, avgOverall || 0, avgMarks || 0);
+      await RatingSummary.findOneAndUpdate(
+        { offering: o._id, term: termId },
+        { summary: summaryObj.summary, avgOverall: summaryObj.avgOverall, avgMarks: summaryObj.avgMarks, count: summaryObj.count },
+        { upsert: true, new: true }
+      );
+    } catch (inner) {
+      console.warn('Could not generate summary for offering', o._id, inner && inner.message);
+    }
+  }
+}
     if (!isProd && err && err.stack) payload.stack = err.stack;
     return res.status(500).json({ success: false, error: payload });
   }
@@ -83,7 +110,7 @@ exports.renderAddClassForm = async (req, res) => {
   }
 };
 
-// List terms (admin)
+// List terms (admin - HTML view)
 exports.listTerms = async (req, res) => {
   try {
     const terms = await Term.find().sort({ startDate: -1 }).lean();
@@ -91,10 +118,20 @@ exports.listTerms = async (req, res) => {
     const message = req.query && req.query.message ? req.query.message : null;
     const error = req.query && req.query.error ? req.query.error : null;
     return res.render('admin/admin-terms', { title: 'Terms', terms, message, error });
-    // return res.json({ title: 'Terms', terms, message, error });
   } catch (err) {
     console.error('listTerms error', err);
     return res.status(500).send('Server error');
+  }
+};
+
+// List terms (admin - JSON API for React admin pages)
+exports.listTermsJson = async (req, res) => {
+  try {
+    const terms = await Term.find().sort({ startDate: -1 }).lean();
+    return res.json({ success: true, data: { terms } });
+  } catch (err) {
+    console.error('listTermsJson error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
   }
 };
 
@@ -129,6 +166,12 @@ exports.activateTerm = async (req, res) => {
     term.isActive = true;
     await term.save();
     await Audit.create({ action: 'term.activate', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: term._id });
+
+    try {
+      if (prevActiveTerm && prevActiveTerm._id) await generateSummariesForTerm(prevActiveTerm._id);
+    } catch (e) {
+      console.error('Error generating summaries for previous term', e && e.stack ? e.stack : e);
+    }
     return res.json({ success: true, data: { term } });
   } catch (err) {
     console.error('activateTerm error', err);
@@ -194,30 +237,8 @@ exports.promoteTerm = async (req, res) => {
       }
     }
 
-    // generate and store comment summaries for the previous term (if any)
     try {
-      const prevTerm = prevActiveTerm; // captured earlier
-      if (prevTerm && prevTerm._id) {
-        const Rating = require('../models').Rating;
-        const RatingSummary = require('../models').RatingSummary;
-        const Offering = require('../models').Offering;
-        const { summarizeComments } = require('../lib/commentSummarizer');
-
-        const offerings = await Offering.find({ term: prevTerm._id }).select('_id').lean();
-        for (const o of offerings) {
-          try {
-            const ratings = await Rating.find({ offering: o._id }).lean();
-            if (!ratings || ratings.length === 0) continue;
-            const comments = ratings.map(r => r.comment).filter(Boolean);
-            const avgOverall = ratings.reduce((s, r) => s + (r.overallRating || 0), 0) / ratings.length;
-            const avgMarks = ratings.reduce((s, r) => s + (typeof r.obtainedMarks !== 'undefined' && r.obtainedMarks !== null ? r.obtainedMarks : 0), 0) / ratings.length;
-            const summaryObj = summarizeComments(comments, avgOverall || 0, avgMarks || 0);
-            await RatingSummary.findOneAndUpdate({ offering: o._id, term: prevTerm._id }, { summary: summaryObj.summary, avgOverall: summaryObj.avgOverall, avgMarks: summaryObj.avgMarks, count: summaryObj.count }, { upsert: true, new: true });
-          } catch (inner) {
-            console.warn('Could not generate summary for offering', o._id, inner && inner.message);
-          }
-        }
-      }
+      if (prevActiveTerm && prevActiveTerm._id) await generateSummariesForTerm(prevActiveTerm._id);
     } catch (e) {
       console.error('Error generating summaries for previous term', e && e.stack ? e.stack : e);
     }
@@ -243,10 +264,16 @@ exports.updateTerm = async (req, res) => {
     if (startDate) term.startDate = new Date(startDate);
     if (endDate) term.endDate = new Date(endDate);
     if (activate) {
+      const prevActiveTerm = await Term.findOne({ isActive: true }).lean();
       // require dates
       if (!term.startDate || !term.endDate) return res.status(400).json({ success: false, error: { message: 'Start and End dates required to activate' } });
       await Term.updateMany({}, { isActive: false });
       term.isActive = true;
+      try {
+        if (prevActiveTerm && prevActiveTerm._id) await generateSummariesForTerm(prevActiveTerm._id);
+      } catch (e) {
+        console.error('Error generating summaries for previous term', e && e.stack ? e.stack : e);
+      }
     }
     await term.save();
     await Audit.create({ action: 'term.update', actor: req.user ? req.user._id : null, targetType: 'Term', targetId: term._id });
@@ -368,7 +395,7 @@ exports.addClassManually = async (req, res) => {
   }
 };
 
-// List offerings filtered by term (admin view)
+// List offerings filtered by term (admin HTML view)
 exports.listOfferingsByTerm = async (req, res) => {
   try {
     const termId = req.query.term;
@@ -379,11 +406,28 @@ exports.listOfferingsByTerm = async (req, res) => {
     if (term && term._id) filter.term = term._id;
     const offerings = await Offering.find(filter).populate('course teacher department program term').sort({ 'course.code': 1 }).lean();
     const terms = await Term.find().sort({ startDate: -1 }).lean();
-  return res.render('admin/admin-offerings', { title: 'Offerings', offerings, terms, currentTerm: term, user: req.user });
-  // return res.json({ title: 'Offerings', offerings, terms, currentTerm: term, user: req.user });
+    return res.render('admin/admin-offerings', { title: 'Offerings', offerings, terms, currentTerm: term, user: req.user });
   } catch (err) {
     console.error('listOfferingsByTerm error', err);
     return res.status(500).send('Server error');
+  }
+};
+
+// List offerings filtered by term (admin JSON API for React admin pages)
+exports.listOfferingsByTermJson = async (req, res) => {
+  try {
+    const termId = req.query.term;
+    let term = null;
+    if (termId) term = await Term.findById(termId).lean();
+    if (!term) term = await Term.findOne({ isActive: true }).lean();
+    const filter = {};
+    if (term && term._id) filter.term = term._id;
+    const offerings = await Offering.find(filter).populate('course teacher department program term').sort({ 'course.code': 1 }).lean();
+    const terms = await Term.find().sort({ startDate: -1 }).lean();
+    return res.json({ success: true, data: { offerings, terms, currentTerm: term } });
+  } catch (err) {
+    console.error('listOfferingsByTermJson error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
   }
 };
 
@@ -400,6 +444,31 @@ exports.renderOfferingEditForm = async (req, res) => {
   } catch (err) {
     console.error('renderOfferingEditForm error', err);
     return res.status(500).send('Server error');
+  }
+};
+
+// JSON variant of offering edit data for React admin pages
+exports.renderOfferingEditFormJson = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const offering = await Offering.findById(id).populate('course teacher department program term').lean();
+    if (!offering) {
+      return res
+        .status(404)
+        .json({ success: false, error: { message: 'Offering not found' } });
+    }
+    const terms = await Term.find().sort({ startDate: -1 }).lean();
+    const departments = await require('../models').Department.find().lean();
+    const programs = await require('../models').Program.find().lean();
+    return res.json({
+      success: true,
+      data: { offering, terms, departments, programs },
+    });
+  } catch (err) {
+    console.error('renderOfferingEditFormJson error', err);
+    return res
+      .status(500)
+      .json({ success: false, error: { message: 'Server error' } });
   }
 };
 

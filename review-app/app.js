@@ -30,6 +30,7 @@ var usersRouter = require('./routes/users');
 var authApiRouter = require('./routes/auth');
 var adminTimetableRouter = require('./routes/adminTimetable');
 var adminUsersRouter = require('./routes/adminUsers');
+var adminApiRouter = require('./routes/api-admin');
 var viewsRouter = require('./routes/views');
 var ratingsRouter = require('./routes/ratings');
 var apiRatingsRouter = require('./routes/api-ratings');
@@ -65,6 +66,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/api/auth', authApiRouter);
+app.use('/api/admin', adminApiRouter);
 // Mount admin routes (manual class add). Upload functionality has been removed.
 app.use('/admin', adminTimetableRouter);
 app.use('/admin/users', adminUsersRouter);

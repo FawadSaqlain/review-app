@@ -1,0 +1,125 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { fetchMe } from '../features/auth/authSlice.js';
+import { listRatings } from '../features/ratings/ratingsSlice.js';
+
+function offeringLabel(r) {
+  try {
+    const t = r?.offering?.teacher;
+    const c = r?.offering?.course;
+
+    const teacherName = t
+      ? t.name
+        ? `${t.name.first || ''}${t.name.last ? ' ' + t.name.last : ''}`.trim()
+        : t.email || 'TBD'
+      : 'TBD';
+
+    const courseLabel = c ? `${c.code ? c.code + ' - ' : ''}${c.title || c.name || ''}`.trim() : '';
+
+    return `${teacherName}${courseLabel ? ' — ' + courseLabel : ''}`;
+  } catch (e) {
+    return 'N/A';
+  }
+}
+
+export default function StudentRatingsDashboardPage() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const { user } = useSelector((s) => s.auth);
+  const ratings = useSelector((s) => s.ratings);
+
+  const [search, setSearch] = useState('');
+
+  const query = useMemo(() => {
+    const studentId = user?._id || user?.id || null;
+    return {
+      search,
+      student: studentId || undefined,
+      termActive: true,
+      page: 1,
+      limit: 50,
+      sort: 'createdAt',
+      order: 'desc'
+    };
+  }, [search, user]);
+
+  useEffect(() => {
+    if (!user) dispatch(fetchMe());
+  }, [dispatch, user]);
+
+  useEffect(() => {
+    if (user) dispatch(listRatings(query));
+  }, [dispatch, user, query]);
+
+  const onApply = (e) => {
+    e.preventDefault();
+    if (user) dispatch(listRatings(query));
+  };
+
+  return (
+    <div className="card">
+      <h1>
+        <i className="fa-solid fa-star-half-stroke" style={{ marginRight: 8, color: 'var(--primary)' }} />
+        My Ratings
+      </h1>
+
+      <form className="filters" style={{ marginTop: 8 }} onSubmit={onApply}>
+        <label>
+          Search
+          <br />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} type="text" placeholder="comment or course/teacher" />
+        </label>
+        <button type="submit" disabled={ratings.status === 'loading'}>
+          {ratings.status === 'loading' ? 'Loading…' : 'Apply'}
+        </button>
+      </form>
+
+      {ratings.error && <div className="response">{ratings.error}</div>}
+
+      <div id="results">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Offering (Teacher — Course)</th>
+              <th>Overall</th>
+              <th>Marks</th>
+              <th>Comment</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(ratings.items || []).map((r) => (
+              <tr key={r._id}>
+                <td>{offeringLabel(r)}</td>
+                <td>{r.overallRating}</td>
+                <td>{r.obtainedMarks}</td>
+                <td>{r.comment || ''}</td>
+                <td>{r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}</td>
+                <td>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigate(`/ratings/edit/${r._id}`);
+                    }}
+                  >
+                    Edit
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {(!ratings.items || ratings.items.length === 0) && (
+              <tr>
+                <td colSpan={6} className="muted">
+                  No ratings found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

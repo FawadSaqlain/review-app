@@ -1,7 +1,7 @@
 const { User, Audit } = require('../models');
 const bcrypt = require('bcrypt');
 
-// List users (paginated basic)
+// List users (paginated basic - HTML view)
 exports.list = async (req, res) => {
   try {
     const q = req.query.q || '';
@@ -14,6 +14,22 @@ exports.list = async (req, res) => {
   } catch (err) {
     console.error('adminUsers.list error', err);
     return res.status(500).send('Server error');
+  }
+};
+
+// List users (paginated basic - JSON API for React admin pages)
+exports.listJson = async (req, res) => {
+  try {
+    const q = req.query.q || '';
+    const page = Math.max(1, parseInt(req.query.page || '1', 10));
+    const limit = 50;
+    const filter = q ? { $or: [{ email: new RegExp(q, 'i') }, { 'name.first': new RegExp(q, 'i') }, { 'name.last': new RegExp(q, 'i') }] } : {};
+    const total = await User.countDocuments(filter);
+    const users = await User.find(filter).sort({ email: 1 }).skip((page - 1) * limit).limit(limit).lean();
+    return res.json({ success: true, data: { users, page, total, q } });
+  } catch (err) {
+    console.error('adminUsers.listJson error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
   }
 };
 
@@ -99,6 +115,54 @@ exports.create = async (req, res) => {
   }
 };
 
+// Create user (JSON API for React admin pages)
+exports.createJson = async (req, res) => {
+  try {
+    const { email, password, role, firstName, lastName, degreeShort, rollNumber, intake, semesterNumber, section, cgpa, phone } = req.body;
+    if (!email || !password) return res.status(400).json({ success: false, error: { message: 'Email and password required' } });
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) return res.status(409).json({ success: false, error: { message: 'Email already exists' } });
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    // Try to infer intake/degree/roll if not provided
+    let intakeObj = null;
+    let degree = degreeShort || null;
+    let roll = rollNumber || null;
+    let semNum = semesterNumber ? Number(semesterNumber) : null;
+    if ((!degree || !roll || !semNum) && email) {
+      const parsed = parseCuiEmail(email);
+      if (parsed) {
+        degree = degree || parsed.degreeShort;
+        roll = roll || parsed.rollStr;
+        semNum = semNum || computeSemesterNumberFromIntake(parsed.season, parsed.intakeYear);
+        intakeObj = { season: parsed.season, year: parsed.intakeYear };
+      }
+    }
+
+    const user = new User({
+      email: email.toLowerCase(),
+      passwordHash,
+      role: role || 'student',
+      name: { first: firstName || '', last: lastName || '' },
+      isActive: true,
+      degreeShort: degree || undefined,
+      rollNumber: roll || undefined,
+      intake: intakeObj || undefined,
+      semesterNumber: semNum || undefined,
+      section: section || undefined,
+      cgpa: cgpa ? Number(cgpa) : undefined,
+      phone: phone || undefined
+    });
+    await user.save();
+    await Audit.create({ action: 'admin.user.create', actor: req.user._id, targetType: 'User', targetId: user._id });
+    return res.status(201).json({ success: true, data: { user } });
+  } catch (err) {
+    console.error('adminUsers.createJson error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
+  }
+};
+
 // Render edit form
 exports.renderEdit = async (req, res) => {
   try {
@@ -108,6 +172,18 @@ exports.renderEdit = async (req, res) => {
   } catch (err) {
     console.error('adminUsers.renderEdit error', err);
     return res.status(500).send('Server error');
+  }
+};
+
+// Get single user (JSON API for React admin pages)
+exports.getOneJson = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).lean();
+    if (!user) return res.status(404).json({ success: false, error: { message: 'User not found' } });
+    return res.json({ success: true, data: { user } });
+  } catch (err) {
+    console.error('adminUsers.getOneJson error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
   }
 };
 
@@ -153,6 +229,51 @@ exports.update = async (req, res) => {
   } catch (err) {
     console.error('adminUsers.update error', err);
     return res.status(500).send('Server error');
+  }
+};
+
+// Update user (JSON API for React admin pages)
+exports.updateJson = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, error: { message: 'User not found' } });
+    const { email, role, firstName, lastName, isActive, degreeShort, rollNumber, intake, semesterNumber, section, cgpa, phone } = req.body;
+    user.email = email ? email.toLowerCase() : user.email;
+    user.role = role || user.role;
+    user.name = { first: firstName || (user.name && user.name.first) || '', last: lastName || (user.name && user.name.last) || '' };
+    user.isActive = typeof isActive !== 'undefined' ? !!isActive : user.isActive;
+    // intake/degree/roll/semester parsing
+    let semNum = semesterNumber ? Number(semesterNumber) : user.semesterNumber;
+    let intakeObj = user.intake;
+    let degree = degreeShort || user.degreeShort;
+    let roll = rollNumber || user.rollNumber;
+    if ((!degree || !roll || !semNum) && user.email) {
+      const parsed = parseCuiEmail(user.email);
+      if (parsed) {
+        degree = degree || parsed.degreeShort;
+        roll = roll || parsed.rollStr;
+        semNum = semNum || computeSemesterNumberFromIntake(parsed.season, parsed.intakeYear);
+        intakeObj = intakeObj || { season: parsed.season, year: parsed.intakeYear };
+      }
+    }
+    user.degreeShort = degree || user.degreeShort;
+    user.rollNumber = roll || user.rollNumber;
+    user.intake = intakeObj || user.intake;
+    user.semesterNumber = semNum || user.semesterNumber;
+    user.section = section || user.section;
+    user.cgpa = cgpa ? Number(cgpa) : user.cgpa;
+    user.phone = phone || user.phone;
+    // change password if provided
+    if (req.body.password && req.body.password.length > 0) {
+      const salt = await bcrypt.genSalt(10);
+      user.passwordHash = await bcrypt.hash(req.body.password, salt);
+    }
+    await user.save();
+    await Audit.create({ action: 'admin.user.update', actor: req.user._id, targetType: 'User', targetId: user._id });
+    return res.json({ success: true, data: { user } });
+  } catch (err) {
+    console.error('adminUsers.updateJson error', err);
+    return res.status(500).json({ success: false, error: { message: 'Server error' } });
   }
 };
 

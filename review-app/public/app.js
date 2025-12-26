@@ -31,9 +31,7 @@ document.addEventListener('submit', async (e) => {
   if (!document.getElementById('response')) form.parentNode.appendChild(responseEl);
 
   // if admin login success and token present, store for admin upload
-  if (form.action.includes('/api/auth/admin/login') && data && data.success && data.data && data.data.token) {
-    // prevent mixed sessions: admin should not keep a student token
-    localStorage.removeItem('token');
+  if (form.action.includes('/admin/login') && data && data.success && data.data && data.data.token) {
     localStorage.setItem('adminToken', data.data.token);
     try { localStorage.setItem('user', JSON.stringify(data.data.user || {})); } catch (e) {}
     // redirect to `next` query param if provided (adminRequire appends ?next=...),
@@ -50,8 +48,6 @@ document.addEventListener('submit', async (e) => {
 
   // if normal login (student) success, store token and user info
   if (form.action.includes('/api/auth/login') && data && data.success && data.data && data.data.token) {
-    // prevent mixed sessions: student should not keep an admin token
-    localStorage.removeItem('adminToken');
     localStorage.setItem('token', data.data.token);
     try { localStorage.setItem('user', JSON.stringify(data.data.user || {})); } catch (e) {}
     // redirect to next (if provided) or to ratings page so user lands on the expected area

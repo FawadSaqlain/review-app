@@ -62,8 +62,7 @@
         try { userObj = JSON.parse(localStorage.getItem('user') || 'null'); } catch(e){ userObj = null; }
 
         // Determine role: admin > student > anon
-        const isAdmin = !!adminToken || (userObj && userObj.role === 'admin');
-        const role = isAdmin ? 'admin' : (userToken ? 'student' : 'anon');
+        const role = adminToken ? 'admin' : (userToken ? 'student' : 'anon');
 
         // first hide everything to create a predictable baseline
         [homeLink, signupLink, loginLink, adminLink, adminAddClassLink, adminUsersLink, adminOfferingsLink, adminTermsLink, adminLogout, userLink, giveReviewLink, viewRatingsLink, myReviewsLink, userDisplay, commonLogout, profileBanner].forEach(x=>{ try{ if(x) x.style.display='none'; }catch(e){} });
