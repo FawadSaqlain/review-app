@@ -32,7 +32,11 @@ export default function Header() {
       <div className="brand">
         <Link to="/" className="brand-link">
           <span className="brand-logo">
-            <i className="fa-regular fa-eye" />
+            <img
+              src="/Remove background project.png"
+              alt="CVUR Portal Logo"
+              style={{ height: '40px', width: '70px', objectFit: 'contain', borderRadius: '6px' }}
+            />
           </span>
           <div>
             <span className="brand-title">CVUR Portal</span>
