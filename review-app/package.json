@@ -7,12 +7,14 @@
     "seed-admin": "node scripts/seed-admin.js"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.1.0",
     "@google/genai": "^1.26.0",
     "bcrypt": "^5.1.0",
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",
     "dotenv": "^16.0.0",
     "ejs": "^3.1.10",
+    "exceljs": "^4.3.0",
     "express": "^4.21.2",
     "express-ejs-layouts": "^2.5.1",
     "express-fileupload": "^1.4.0",
@@ -21,8 +23,7 @@
     "mongoose": "^7.0.0",
     "morgan": "^1.10.1",
     "multer": "^1.4.5-lts.1",
-  "nodemailer": "^7.0.9",
-  "exceljs": "^4.3.0"
+    "nodemailer": "^7.0.9"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
