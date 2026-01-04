@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { forgotPassword } from '../features/auth/authSlice.js';
 
@@ -10,14 +10,16 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
 
+  const navigate = useNavigate();
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
     const action = await dispatch(forgotPassword({ email }));
     if (forgotPassword.fulfilled.match(action)) {
-      const msg = action.payload?.data?.message || 'If the email exists, a reset link will be sent.';
-      const token = action.payload?.data?.token;
-      setMessage(token ? `${msg} (dev token: ${token})` : msg);
+      const msg = action.payload?.data?.message || 'If the email exists, a reset code will be sent to your email.';
+      setMessage(msg);
+      navigate('/reset-password', { replace: true, state: { email } });
     }
   };
 

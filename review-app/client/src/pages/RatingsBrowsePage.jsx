@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../lib/api.js';
+import { fetchMe } from '../features/auth/authSlice.js';
 
 function formatName(name) {
   if (!name) return '';
@@ -24,6 +27,10 @@ function courseLabel(course) {
 }
 
 export default function RatingsBrowsePage() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const { user } = useSelector((s) => s.auth);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState(null);
@@ -35,6 +42,18 @@ export default function RatingsBrowsePage() {
   const query = useMemo(() => ({ search, page: 1, limit: 100 }), [search]);
 
   useEffect(() => {
+    // Ensure we know who the user is
+    if (!user) {
+      dispatch(fetchMe());
+      return;
+    }
+
+    // If profile is not complete, send to Complete Profile first
+    if (user && user.profileComplete === false) {
+      navigate('/complete-profile', { replace: true });
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -54,14 +73,15 @@ export default function RatingsBrowsePage() {
         setStatus('succeeded');
       } catch (e) {
         if (cancelled) return;
-        setStatus('failed');
         setError(e.message || 'Failed to load summaries');
+        setStatus('failed');
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [user, dispatch, navigate, query]);
 
   const onSubmit = (e) => {
     e.preventDefault();

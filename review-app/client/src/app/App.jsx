@@ -5,6 +5,7 @@ import LoginPage from '../pages/LoginPage.jsx';
 import SignupPage from '../pages/SignupPage.jsx';
 import VerifySignupPage from '../pages/VerifySignupPage.jsx';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage.jsx';
+import ResetPasswordPage from '../pages/ResetPasswordPage.jsx';
 import ProfilePage from '../pages/ProfilePage.jsx';
 import CompleteProfilePage from '../pages/CompleteProfilePage.jsx';
 import AdminLoginPage from '../pages/admin/AdminLoginPage.jsx';
@@ -12,6 +13,7 @@ import RatingsBrowsePage from '../pages/RatingsBrowsePage.jsx';
 import StudentRatingsDashboardPage from '../pages/StudentRatingsDashboardPage.jsx';
 import StudentEditReviewPage from '../pages/StudentEditReviewPage.jsx';
 import AdminRatingsPage from '../pages/admin/AdminRatingsPage.jsx';
+import AdminDashboardPage from '../pages/admin/AdminDashboardPage.jsx';
 import AdminTermsPage from '../pages/admin/AdminTermsPage.jsx';
 import AdminOfferingsPage from '../pages/admin/AdminOfferingsPage.jsx';
 import AdminOfferingEditPage from '../pages/admin/AdminOfferingEditPage.jsx';
@@ -32,6 +34,7 @@ export default function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/verify-signup" element={<VerifySignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route path="/ratings" element={<RatingsBrowsePage />} />
 
@@ -49,6 +52,7 @@ export default function App() {
 
         <Route element={<RequireAdmin />}
         >
+          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
           <Route path="/admin/ratings" element={<AdminRatingsPage />} />
           <Route path="/admin/terms" element={<AdminTermsPage />} />
           <Route path="/admin/offerings" element={<AdminOfferingsPage />} />

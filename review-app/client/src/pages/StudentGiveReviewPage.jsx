@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { apiRequest } from '../lib/api.js';
+import { fetchMe } from '../features/auth/authSlice.js';
 
 export default function StudentGiveReviewPage() {
+  const dispatch = useDispatch();
+  const { user } = useSelector((s) => s.auth);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [offerings, setOfferings] = useState([]);
@@ -11,6 +15,16 @@ export default function StudentGiveReviewPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!user) {
+      dispatch(fetchMe());
+      return;
+    }
+
+    if (user && user.profileComplete === false) {
+      navigate('/complete-profile', { replace: true });
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -30,7 +44,7 @@ export default function StudentGiveReviewPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user, dispatch, navigate]);
 
   const handleGiveReview = (offeringId) => {
     navigate(`/ratings/give/${offeringId}`);

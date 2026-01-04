@@ -17,7 +17,7 @@ export default function AdminLoginPage() {
     if (adminToken) {
       const params = new URLSearchParams(location.search);
       const next = params.get('next');
-      navigate(next ? decodeURIComponent(next) : '/admin/ratings', { replace: true });
+      navigate(next ? decodeURIComponent(next) : '/admin/dashboard', { replace: true });
     }
   }, [adminToken, location.search, navigate]);
 

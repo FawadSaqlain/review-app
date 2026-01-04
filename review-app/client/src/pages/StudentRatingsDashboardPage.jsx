@@ -46,11 +46,21 @@ export default function StudentRatingsDashboardPage() {
   }, [search, user]);
 
   useEffect(() => {
-    if (!user) dispatch(fetchMe());
-  }, [dispatch, user]);
+    if (!user) {
+      dispatch(fetchMe());
+      return;
+    }
+
+    if (user && user.profileComplete === false) {
+      navigate('/complete-profile', { replace: true });
+      return;
+    }
+  }, [dispatch, user, navigate]);
 
   useEffect(() => {
-    if (user) dispatch(listRatings(query));
+    if (user && user.profileComplete !== false) {
+      dispatch(listRatings(query));
+    }
   }, [dispatch, user, query]);
 
   const onApply = (e) => {

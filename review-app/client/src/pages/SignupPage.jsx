@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -23,7 +24,12 @@ export default function SignupPage() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
-    const action = await dispatch(signup({ name, email, password }));
+    if (password !== confirmPassword) {
+      setMessage('Passwords do not match.');
+      return;
+    }
+
+    const action = await dispatch(signup({ name, email, password, confirmPassword }));
     if (signup.fulfilled.match(action)) {
       const otp = action.payload?.data?.otpForDev;
       if (otp) setMessage(`Dev OTP: ${otp}`);
@@ -46,6 +52,15 @@ export default function SignupPage() {
         <div className="form-row">
           <label>Password</label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </div>
+        <div className="form-row">
+          <label>Confirm Password</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
         </div>
         <button type="submit" disabled={status === 'loading'}>
           {status === 'loading' ? 'Creating…' : 'Create Account'}

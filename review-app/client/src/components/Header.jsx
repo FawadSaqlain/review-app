@@ -77,7 +77,8 @@ export default function Header() {
 
         {role === 'admin' && (
           <>
-            <Link to="/admin/ratings">Admin • Dashboard</Link>
+            <Link to="/admin/dashboard">Admin Dashboard</Link>
+            <Link to="/admin/ratings">View Ratings</Link>
             <Link to="/admin/terms">Terms</Link>
             <Link to="/admin/offerings">Manage Offerings</Link>
             <Link to="/admin/users">Manage Users</Link>

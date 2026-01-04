@@ -11,11 +11,11 @@ const initialState = {
   lastSignupOtpForDev: null
 };
 
-export const signup = createAsyncThunk('auth/signup', async ({ email, password, name }) => {
+export const signup = createAsyncThunk('auth/signup', async ({ email, password, confirmPassword, name }) => {
   const json = await apiRequest('/api/auth/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, name })
+    body: JSON.stringify({ email, password, confirmPassword, name })
   });
   return json;
 });
@@ -69,6 +69,18 @@ export const forgotPassword = createAsyncThunk('auth/forgotPassword', async ({ e
   });
   return json;
 });
+
+export const resetPassword = createAsyncThunk(
+  'auth/resetPassword',
+  async ({ email, otp, newPassword, confirmPassword }) => {
+    const json = await apiRequest('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp, newPassword, confirmPassword })
+    });
+    return json;
+  }
+);
 
 export const completeProfile = createAsyncThunk('auth/completeProfile', async (formData) => {
   const json = await apiRequest('/api/auth/complete-profile', {

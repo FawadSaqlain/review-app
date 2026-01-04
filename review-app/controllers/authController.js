@@ -15,8 +15,12 @@ const blacklist = require('../utils/tokenBlacklist');
 // Signup (student)
 exports.signup = async (req, res) => {
   try {
-    const { email, password, name, studentId } = req.body;
+    const { email, password, confirmPassword, name, studentId } = req.body;
     if (!email || !password) return res.status(400).json({ success: false, error: { code: 'ERR_VALIDATION', message: 'Email and password required' } });
+
+    if (typeof confirmPassword !== 'string' || password !== confirmPassword) {
+      return res.status(400).json({ success: false, error: { code: 'ERR_PASSWORD_MISMATCH', message: 'Passwords do not match' } });
+    }
 
     const normalizedEmail = email.toLowerCase();
     const existing = await User.findOne({ email: normalizedEmail });
@@ -114,14 +118,14 @@ exports.signup = async (req, res) => {
     const tokenHash = crypto.createHash('sha256').update(otp).digest('hex');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 15); // 15 minutes
 
-  await Verification.create({ email: normalizedEmail, user: user._id, tokenHash, purpose: 'signup', campus: 'CUI-Vehari', expiresAt });
+    await Verification.create({ email: normalizedEmail, user: user._id, tokenHash, purpose: 'signup', campus: 'CUI-Vehari', expiresAt });
 
     // send OTP to university email
     try {
       const subject = 'COMSATS Vehari - Account Verification OTP';
       const text = `Your verification code is: ${otp}. It expires in 15 minutes.`;
-      console.log('sending signup email to', normalizedEmail,'with OTP', otp);
-      // await emailUtil.send({ to: normalizedEmail, subject, text });
+      console.log('sending signup email to', normalizedEmail, 'with OTP', otp);
+      await emailUtil.send({ to: normalizedEmail, subject, text });
     } catch (sendErr) {
       console.warn('failed to send email, returning OTP in response for dev', sendErr);
       // in dev mode return token; in prod we wouldn't do this
@@ -481,25 +485,106 @@ exports.adminLogin = async (req, res) => {
   }
 };
 
-// Forgot password — generate a one-time token and (placeholder) send via email
+// Forgot password — send a short-lived OTP to the user's email for password reset
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, error: { code: 'ERR_VALIDATION', message: 'Email required' } });
+    if (!email) {
+      return res.status(400).json({ success: false, error: { code: 'ERR_VALIDATION', message: 'Email required' } });
+    }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) return res.status(200).json({ success: true, data: { message: 'If the email exists, a reset link will be sent' } });
+    const normalizedEmail = email.toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      // Do not reveal whether the email exists
+      return res.status(200).json({ success: true, data: { message: 'If the email exists, a reset code will be sent.' } });
+    }
 
-    // create a token (short-lived) — store hashed in audit/details for now; in production use a dedicated passwordReset collection
-    const token = crypto.randomBytes(20).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const tokenHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 15); // 15 minutes
 
-    await Audit.create({ action: 'user.forgotPassword', actor: user._id, targetType: 'User', targetId: user._id, details: { tokenHash, createdAt: new Date() } });
+    await Verification.create({
+      email: normalizedEmail,
+      user: user._id,
+      tokenHash,
+      purpose: 'password',
+      campus: 'CUI-Vehari',
+      expiresAt
+    });
 
-    // TODO: integrate email provider (Nodemailer/SendGrid). For now, return token in response for manual testing.
-    return res.status(200).json({ success: true, data: { message: 'Password reset token generated (development)', token } });
+    try {
+      const subject = 'COMSATS Vehari - Password Reset OTP';
+      const text = `Your password reset code is: ${otp}. It expires in 15 minutes.`;
+      console.log('sending password reset email to', normalizedEmail, 'with OTP', otp);
+      await emailUtil.send({ to: normalizedEmail, subject, text });
+    } catch (sendErr) {
+      console.warn('forgotPassword email send failed', sendErr);
+      await Audit.create({
+        action: 'user.forgotPassword.emailFail',
+        actor: user._id,
+        targetType: 'User',
+        targetId: user._id,
+        details: { error: String(sendErr) }
+      });
+      // Still return generic success for security; OTP was not actually sent.
+      return res.status(200).json({ success: true, data: { message: 'If the email exists, a reset code will be sent.' } });
+    }
+
+    await Audit.create({ action: 'user.forgotPassword', actor: user._id, targetType: 'User', targetId: user._id });
+
+    return res.status(200).json({
+      success: true,
+      data: { message: 'If the email exists, a reset code will be sent.' }
+    });
   } catch (err) {
     console.error('forgotPassword error', err);
+    return res.status(500).json({ success: false, error: { code: 'ERR_INTERNAL', message: 'Server error' } });
+  }
+};
+
+// POST /api/auth/reset-password { email, otp, newPassword, confirmPassword }
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword, confirmPassword } = req.body;
+    if (!email || !otp || !newPassword || !confirmPassword) {
+      return res.status(400).json({ success: false, error: { code: 'ERR_VALIDATION', message: 'Email, OTP and new password are required' } });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, error: { code: 'ERR_PASSWORD_MISMATCH', message: 'Passwords do not match' } });
+    }
+
+    const normalizedEmail = email.toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      // Do not reveal account existence
+      return res.status(400).json({ success: false, error: { code: 'ERR_INVALID_TOKEN', message: 'Invalid email or code' } });
+    }
+
+    const record = await Verification.findOne({ email: normalizedEmail, user: user._id, purpose: 'password' }).sort({ createdAt: -1 });
+    if (!record) {
+      return res.status(400).json({ success: false, error: { code: 'ERR_INVALID_TOKEN', message: 'Invalid or expired code' } });
+    }
+    if (record.expiresAt < new Date()) {
+      return res.status(400).json({ success: false, error: { code: 'ERR_EXPIRED_TOKEN', message: 'Code expired' } });
+    }
+
+    const hash = crypto.createHash('sha256').update(otp).digest('hex');
+    if (hash !== record.tokenHash) {
+      return res.status(400).json({ success: false, error: { code: 'ERR_INVALID_TOKEN', message: 'Invalid code' } });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+    user.passwordHash = passwordHash;
+    await user.save();
+
+    await Audit.create({ action: 'user.resetPassword', actor: user._id, targetType: 'User', targetId: user._id });
+
+    return res.status(200).json({ success: true, data: { message: 'Password updated successfully. You may now log in with your new password.' } });
+  } catch (err) {
+    console.error('resetPassword error', err);
     return res.status(500).json({ success: false, error: { code: 'ERR_INTERNAL', message: 'Server error' } });
   }
 };

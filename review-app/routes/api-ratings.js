@@ -4,8 +4,8 @@ const api = require('../controllers/ratingApiController');
 const adminAuth = require('../middleware/adminAuth');
 const loginRequire = require('../middleware/loginRequire');
 
-// list ratings with filters
-router.get('/', api.list);
+// list ratings with filters (login required so we can enforce profile completion for students)
+router.get('/', loginRequire, api.list);
 router.get('/summary', api.summary);
 
 // list stored summaries (inactive terms only)
