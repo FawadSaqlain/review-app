@@ -7,6 +7,7 @@ export default function StudentGiveReviewFormPage() {
   const navigate = useNavigate();
 
   const [overallRating, setOverallRating] = useState('');
+  const [hoverRating, setHoverRating] = useState(0);
   const [obtainedMarks, setObtainedMarks] = useState('');
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -75,14 +76,23 @@ export default function StudentGiveReviewFormPage() {
         <div className="form-row" style={{ marginBottom: 8 }}>
           <label>
             Overall Rating (1-5)
-            <input
-              type="number"
-              min="1"
-              max="5"
-              value={overallRating}
-              onChange={(e) => setOverallRating(e.target.value)}
-              required
-            />
+            <div className="star-picker" style={{ marginTop: 4 }}>
+              {[1, 2, 3, 4, 5].map((star) => {
+                const activeValue = hoverRating || parseInt(overallRating || 0, 10) || 0;
+                const filled = star <= activeValue;
+                return (
+                  <span
+                    key={star}
+                    className={`star${filled ? ' filled' : ''}`}
+                    onClick={() => setOverallRating(String(star))}
+                    onMouseEnter={() => setHoverRating(star)}
+                    onMouseLeave={() => setHoverRating(0)}
+                  >
+                    ☆
+                  </span>
+                );
+              })}
+            </div>
           </label>
         </div>
 
@@ -91,6 +101,8 @@ export default function StudentGiveReviewFormPage() {
             Obtained Marks
             <input
               type="number"
+              max={100}
+              min={0}
               value={obtainedMarks}
               onChange={(e) => setObtainedMarks(e.target.value)}
               required

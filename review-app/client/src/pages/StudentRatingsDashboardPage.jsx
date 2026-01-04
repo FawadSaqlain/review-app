@@ -115,9 +115,14 @@ export default function StudentRatingsDashboardPage() {
                       navigate(`/ratings/edit/${r._id}`);
                     }}
                     title="Edit rating"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                    }}
                   >
-                    <i className="fa-regular fa-pen-to-square" style={{ marginRight: 6, color: 'var(--primary)' }} />
-                    Edit
+                    <i className="fa-regular fa-pen-to-square" style={{ color: 'var(--primary)' }} />
                   </button>
                 </td>
               </tr>

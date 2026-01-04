@@ -234,66 +234,111 @@ export default function AdminDashboardPage() {
           <div className="card" style={{ marginBottom: 20 }}>
             <h2 style={{ marginTop: 0 }}>Activity snapshot</h2>
             <p className="muted" style={{ marginBottom: 12 }}>
-              Relative activity across key areas. Bar length is scaled to the largest value.
+              Relative activity across key areas. Each tile shows the total and a range line scaled to the busiest area.
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                  <span>
+            <div
+              style={{
+                display: 'flex',
+                gap: 16,
+                flexWrap: 'wrap'
+              }}
+            >
+              <div
+                style={{
+                  flex: '1 1 180px',
+                  borderRadius: 12,
+                  padding: 10,
+                  background: '#020617'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.9rem' }}>
                     <i className="fa-solid fa-user-graduate" style={{ marginRight: 6, color: 'var(--primary)' }} />
                     Students
                   </span>
-                  <span>{stats.usersTotal}</span>
+                  <span style={{ fontWeight: 600 }}>{stats.usersTotal}</span>
                 </div>
-                <div style={{ background: '#020617', borderRadius: 999, marginTop: 4 }}>
-                  <div
-                    style={{
-                      height: 8,
-                      width: barWidth(stats.usersTotal),
-                      borderRadius: 999,
-                      background: 'linear-gradient(90deg,#facc15,#eab308)'
-                    }}
-                  />
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ background: '#020617', borderRadius: 999 }}>
+                    <div
+                      style={{
+                        height: 6,
+                        width: barWidth(stats.usersTotal),
+                        borderRadius: 999,
+                        background: 'linear-gradient(90deg,#facc15,#eab308)'
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: 2 }}>
+                    <span>0</span>
+                    <span>{maxActivity}</span>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                  <span>
+              <div
+                style={{
+                  flex: '1 1 180px',
+                  borderRadius: 12,
+                  padding: 10,
+                  background: '#020617'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.9rem' }}>
                     <i className="fa-solid fa-star-half-stroke" style={{ marginRight: 6, color: 'var(--primary)' }} />
                     Ratings
                   </span>
-                  <span>{stats.ratingsTotal}</span>
+                  <span style={{ fontWeight: 600 }}>{stats.ratingsTotal}</span>
                 </div>
-                <div style={{ background: '#020617', borderRadius: 999, marginTop: 4 }}>
-                  <div
-                    style={{
-                      height: 8,
-                      width: barWidth(stats.ratingsTotal),
-                      borderRadius: 999,
-                      background: 'linear-gradient(90deg,#facc15,#eab308)'
-                    }}
-                  />
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ background: '#020617', borderRadius: 999 }}>
+                    <div
+                      style={{
+                        height: 6,
+                        width: barWidth(stats.ratingsTotal),
+                        borderRadius: 999,
+                        background: 'linear-gradient(90deg,#facc15,#eab308)'
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: 2 }}>
+                    <span>0</span>
+                    <span>{maxActivity}</span>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                  <span>
+              <div
+                style={{
+                  flex: '1 1 180px',
+                  borderRadius: 12,
+                  padding: 10,
+                  background: '#020617'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.9rem' }}>
                     <i className="fa-solid fa-list-check" style={{ marginRight: 6, color: 'var(--primary)' }} />
                     Offerings
                   </span>
-                  <span>{stats.offeringsTotal}</span>
+                  <span style={{ fontWeight: 600 }}>{stats.offeringsTotal}</span>
                 </div>
-                <div style={{ background: '#020617', borderRadius: 999, marginTop: 4 }}>
-                  <div
-                    style={{
-                      height: 8,
-                      width: barWidth(stats.offeringsTotal),
-                      borderRadius: 999,
-                      background: 'linear-gradient(90deg,#facc15,#eab308)'
-                    }}
-                  />
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ background: '#020617', borderRadius: 999 }}>
+                    <div
+                      style={{
+                        height: 6,
+                        width: barWidth(stats.offeringsTotal),
+                        borderRadius: 999,
+                        background: 'linear-gradient(90deg,#facc15,#eab308)'
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: 2 }}>
+                    <span>0</span>
+                    <span>{maxActivity}</span>
+                  </div>
                 </div>
               </div>
             </div>
