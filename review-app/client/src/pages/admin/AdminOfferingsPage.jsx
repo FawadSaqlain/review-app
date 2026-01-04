@@ -80,7 +80,8 @@ export default function AdminOfferingsPage() {
         <button type="submit">Filter</button>
 
         <div style={{ marginLeft: 'auto' }}>
-          <Link to="/admin/class/add" className="btn btn-primary">
+          <Link to="/admin/class/add" className="btn btn-primary" title="Add class or bulk upload" aria-label="Add class or bulk upload">
+            <i className="fa-solid fa-plus" style={{ marginRight: 6 }} />
             Add Class / Bulk Upload
           </Link>
         </div>
@@ -118,26 +119,35 @@ export default function AdminOfferingsPage() {
                   <td>{off.section || '—'}</td>
                   <td>{off.term && off.term.name ? off.term.name : '—'}</td>
                   <td>
-                    <Link to={`/admin/offerings/${off._id}/edit`} style={{ marginRight: 8 }}>
-                      Edit
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          if (!window.confirm('Delete offering?')) return;
-                          await apiRequest(`/api/admin/offerings/${off._id}`, {
-                            method: 'DELETE',
-                            headers: { Accept: 'application/json' },
-                          });
-                          load(currentTermId);
-                        } catch (err) {
-                          alert(err.message || 'Delete failed');
-                        }
-                      }}
-                    >
-                      Delete
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Link
+                        to={`/admin/offerings/${off._id}/edit`}
+                        title="Edit offering"
+                        aria-label="Edit offering"
+                      >
+                        <i className="fa-solid fa-pen" style={{ color: 'var(--primary)', fontSize: '1rem' }} />
+                      </Link>
+                      <button
+                        type="button"
+                        title="Delete offering"
+                        aria-label="Delete offering"
+                        style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
+                        onClick={async () => {
+                          try {
+                            if (!window.confirm('Delete offering?')) return;
+                            await apiRequest(`/api/admin/offerings/${off._id}`, {
+                              method: 'DELETE',
+                              headers: { Accept: 'application/json' },
+                            });
+                            load(currentTermId);
+                          } catch (err) {
+                            alert(err.message || 'Delete failed');
+                          }
+                        }}
+                      >
+                        <i className="fa-solid fa-trash" style={{ color: 'var(--primary)', fontSize: '1rem' }} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
