@@ -104,7 +104,9 @@ export default function StudentRatingsDashboardPage() {
                     onClick={() => {
                       navigate(`/ratings/edit/${r._id}`);
                     }}
+                    title="Edit rating"
                   >
+                    <i className="fa-regular fa-pen-to-square" style={{ marginRight: 6, color: 'var(--primary)' }} />
                     Edit
                   </button>
                 </td>

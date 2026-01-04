@@ -6,10 +6,12 @@ export default function Layout() {
   return (
     <>
       <Header />
-      <main className="container">
-        <Outlet />
-      </main>
-      <Footer />
+      <div className="layout-shell">
+        <main className="container">
+          <Outlet />
+        </main>
+        <Footer />
+      </div>
     </>
   );
 }

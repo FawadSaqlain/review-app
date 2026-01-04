@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchMe, hydrateUserFromStorage, logout } from '../features/auth/authSlice.js';
@@ -7,6 +7,7 @@ export default function Header() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { token, adminToken, user } = useSelector((s) => s.auth);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     dispatch(hydrateUserFromStorage());
@@ -40,7 +41,17 @@ export default function Header() {
         </Link>
       </div>
 
-      <nav className="site-nav">
+      <button
+        type="button"
+        className="menu-toggle"
+        aria-label="Toggle navigation"
+        aria-expanded={navOpen ? 'true' : 'false'}
+        onClick={() => setNavOpen((open) => !open)}
+      >
+        <span className="menu-toggle-icon" />
+      </button>
+
+      <nav className={"site-nav" + (navOpen ? " is-open" : "")}>
         {role === 'anon' && (
           <>
             <Link to="/">Home</Link>

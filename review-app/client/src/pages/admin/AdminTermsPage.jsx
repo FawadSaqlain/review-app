@@ -273,6 +273,7 @@ export default function AdminTermsPage() {
 
       {/* Inline styles to match the admin-terms.ejs table appearance */}
       <style>{`
+        .admin-terms-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .admin-terms-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
         .admin-terms-table th, .admin-terms-table td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: middle; }
         .admin-terms-table th { background: #111827; color:#f9fafb; font-weight: 600; }
@@ -309,25 +310,28 @@ export default function AdminTermsPage() {
 
       {!loading && !error && (
         terms.length === 0 ? (
-          <table className="admin-terms-table">
-            <tbody>
-              <tr>
-                <td colSpan={5}>No terms</td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="admin-terms-wrapper">
+            <table className="admin-terms-table">
+              <tbody>
+                <tr>
+                  <td colSpan={5}>No terms</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         ) : (
-          <table className="admin-terms-table">
-            <thead>
-              <tr>
-                <th style={{ width: '18%' }}>Name</th>
-                <th style={{ width: '20%' }}>Start Date</th>
-                <th style={{ width: '20%' }}>End Date</th>
-                <th style={{ width: '8%' }}>Active</th>
-                <th style={{ width: '34%' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className="admin-terms-wrapper">
+            <table className="admin-terms-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '18%' }}>Name</th>
+                  <th style={{ width: '20%' }}>Start Date</th>
+                  <th style={{ width: '20%' }}>End Date</th>
+                  <th style={{ width: '8%' }}>Active</th>
+                  <th style={{ width: '34%' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
               {[...terms]
                 .slice()
                 .sort((a, b) => {
@@ -451,8 +455,9 @@ export default function AdminTermsPage() {
                     </tr>
                   );
                 })}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         )
       )}
     </div>

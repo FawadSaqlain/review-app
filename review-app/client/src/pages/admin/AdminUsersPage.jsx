@@ -51,7 +51,7 @@ export default function AdminUsersPage() {
   const canNext = users.length > 0 && users.length === 50; // page size
 
   return (
-    <div className="container">
+    <div className="card">
       <h1>Admin Users</h1>
 
       <p><Link to="/admin/users/new">Create new user</Link></p>
@@ -77,7 +77,8 @@ export default function AdminUsersPage() {
           <p>No users found.</p>
         ) : (
           <>
-            <table className="table">
+            <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table className="table">
               <thead>
                 <tr>
                   <th>Email</th>
@@ -103,27 +104,39 @@ export default function AdminUsersPage() {
                     <td>{u.semesterNumber || '-'}</td>
                     <td>{u.section || '-'}</td>
                     <td>
-                      <Link to={`/admin/users/${u._id}/edit`}>Edit</Link>{' '}
-                      <button
-                        type="button"
-                        className="btn btn-link"
-                        onClick={async () => {
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Link
+                          to={`/admin/users/${u._id}/edit`}
+                          title="Edit user"
+                          aria-label="Edit user"
+                        >
+                          <i className="fa-solid fa-pen" style={{ color: 'var(--primary)', fontSize: '1rem' }} />
+                        </Link>
+                        <button
+                          type="button"
+                          className="btn btn-link"
+                          title="Delete user"
+                          aria-label="Delete user"
+                          style={{ background: 'transparent', border: 'none', padding: 0 }}
+                          onClick={async () => {
                           if (!window.confirm('Delete user?')) return;
-                          try {
-                            await apiRequest(`/api/admin/users/${u._id}`, { method: 'DELETE' });
-                            load(page, q);
-                          } catch (err) {
-                            alert(err.message || 'Delete failed');
-                          }
-                        }}
-                      >
-                        Delete
-                      </button>
+                            try {
+                              await apiRequest(`/api/admin/users/${u._id}`, { method: 'DELETE' });
+                              load(page, q);
+                            } catch (err) {
+                              alert(err.message || 'Delete failed');
+                            }
+                          }}
+                        >
+                          <i className="fa-solid fa-trash" style={{ color: 'var(--primary)', fontSize: '1rem' }} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
 
             <div className="pagination">
               <button className="btn btn-default" disabled={!canPrev || loading} onClick={() => load(page - 1, q)}>Previous</button>
