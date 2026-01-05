@@ -55,9 +55,10 @@ async function generateSummariesForTerm(termId) {
         { offering: o._id, term: termId },
         {
           summary: summaryObj.summary,
-          avgOverall: summaryObj.avgOverall,
-          avgMarks: summaryObj.avgMarks,
-          count: summaryObj.count,
+          // Store numeric aggregates and total review count separately from the comment text.
+          avgOverall: avgOverall || 0,
+          avgMarks: avgMarks || 0,
+          count: ratings.length,
         },
         { upsert: true, new: true }
       );

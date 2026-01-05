@@ -36,9 +36,10 @@ function summarizeComments(comments, avgOverall = 0, avgMarks = 0) {
     const theme = keywords.length ? keywords.slice(0,3).join(', ') : null;
 
     const sentences = [];
-    sentences.push(`Summary (based on ${total} comment(s)): average overall ${avgOverall.toFixed(2)}, average marks ${avgMarks.toFixed(2)}.`);
+    // Only talk about comments here. Numeric aggregates live in separate DB fields.
+    sentences.push(`Summary (based on ${total} comment(s)).`);
     if (theme) sentences.push(`Common topics mentioned include: ${theme}.`);
-    if (posCount > 0 || negCount > 0) sentences.push(`Approximately ${posPct}% positive mentions and ${negPct}% negative/concern mentions among comments.`);
+    if (posCount > 0 || negCount > 0) sentences.push(`Among comments, about ${posPct}% mention positive points and ${negPct}% mention concerns or issues.`);
     if (examples.length) {
       const q = examples.map(e => `"${e}"`).join(' — ');
       sentences.push(`Representative comments: ${q}`);
