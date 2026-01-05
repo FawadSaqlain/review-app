@@ -56,7 +56,12 @@ export default function SignupPage() {
       <form onSubmit={onSubmit}>
         <div className="form-row">
           <label>Name</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" />
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name"
+          />
         </div>
         <div className="form-row">
           <label>Email</label>

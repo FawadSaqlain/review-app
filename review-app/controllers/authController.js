@@ -216,13 +216,40 @@ exports.resendSignupOtp = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ success: false, error: { code: 'ERR_VALIDATION', message: 'Email and password required' } });
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'ERR_VALIDATION', message: 'Email and password required' },
+      });
+    }
 
-    const user = await User.findOne({ email: email.toLowerCase(), isActive: true });
-    if (!user) return res.status(401).json({ success: false, error: { code: 'ERR_AUTH', message: 'Invalid credentials' } });
+    const user = await User.findOne({ email: email.toLowerCase() });
+    // If no user, keep generic invalid-credentials response
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'ERR_AUTH', message: 'Invalid credentials' },
+      });
+    }
+
+    // If user exists but is deactivated by admin, return a clearer message
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'ERR_INACTIVE',
+          message: 'Your account has been deactivated by the admin. Please contact administration.',
+        },
+      });
+    }
 
     const match = await bcrypt.compare(password, user.passwordHash);
-    if (!match) return res.status(401).json({ success: false, error: { code: 'ERR_AUTH', message: 'Invalid credentials' } });
+    if (!match) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'ERR_AUTH', message: 'Invalid credentials' },
+      });
+    }
 
     const token = jwt.sign({ sub: user._id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 

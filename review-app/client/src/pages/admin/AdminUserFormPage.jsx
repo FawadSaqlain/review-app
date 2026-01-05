@@ -185,75 +185,132 @@ export default function AdminUserFormPage() {
         <form onSubmit={handleSubmit}>
           {error && <p className="error">{error}</p>}
 
-          <div className="form-row">
-            <label>Email</label>
-            <input name="email" type="email" required value={form.email} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>First name</label>
-            <input name="firstName" value={form.firstName} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>Last name</label>
-            <input name="lastName" value={form.lastName} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>Degree short (e.g. bse)</label>
-            <input name="degreeShort" value={form.degreeShort} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>Roll number (e.g. 031)</label>
-            <input name="rollNumber" value={form.rollNumber} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>Intake season-year (optional, e.g. fa22)</label>
-            <input name="intake" value={form.intake} onChange={handleChange} placeholder="fa22 or sp22" />
-          </div>
-
-          <div className="form-row">
-            <label>Semester Number</label>
-            <input name="semesterNumber" type="number" min="1" max="12" value={form.semesterNumber} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>Section</label>
-            <input name="section" value={form.section} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>CGPA</label>
-            <input name="cgpa" type="number" step="0.01" min="0" max="4" value={form.cgpa} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>Phone</label>
-            <input name="phone" value={form.phone} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>Password {isEdit ? '(leave blank to keep)' : ''}</label>
-            <input name="password" type="password" value={form.password} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>
+          <div className="form-row form-row-inline">
+            <div className="field">
+              <label>Email</label>
               <input
-                name="isActive"
-                type="checkbox"
-                checked={form.isActive}
+                name="email"
+                type="email"
+                required
+                value={form.email}
                 onChange={handleChange}
-              />{' '}
-              Active
-            </label>
+              />
+            </div>
+            <div className="field">
+              <label>Name</label>
+              <input
+                name="firstName"
+                type="text"
+                value={form.firstName}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-row form-row-inline">
+            <div className="field">
+              <label>Intake season-year (optional, e.g. fa22)</label>
+              <input
+                name="intake"
+                type="text"
+                value={form.intake}
+                onChange={handleChange}
+                placeholder="fa22 or sp22"
+              />
+            </div>
+            <div className="field">
+              <label>Degree short (e.g. bse)</label>
+              <input
+                name="degreeShort"
+                type="text"
+                value={form.degreeShort}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="field">
+              <label>Roll number (e.g. 031)</label>
+              <input
+                name="rollNumber"
+                type="text"
+                value={form.rollNumber}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-row form-row-inline">
+            <div className="field">
+              <label>Semester Number</label>
+              <input
+                name="semesterNumber"
+                type="number"
+                min="1"
+                max="12"
+                value={form.semesterNumber}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="field">
+              <label>Section</label>
+              <input
+                name="section"
+                type="text"
+                value={form.section}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="field">
+              <label>CGPA</label>
+              <input
+                name="cgpa"
+                type="number"
+                step="0.01"
+                min="0"
+                max="4"
+                value={form.cgpa}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-row form-row-inline">
+            <div className="field">
+              <label>Phone</label>
+              <input
+                name="phone"
+                type="text"
+                value={form.phone}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="field">
+              <label>
+                Password {isEdit ? '(leave blank to keep)' : ''}
+              </label>
+              <input
+                name="password"
+                type="password"
+                value={form.password}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="field" style={{ alignSelf: 'center' }}>
+              <label>
+                <input
+                  name="isActive"
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={handleChange}
+                />{' '}
+                Active
+              </label>
+            </div>
           </div>
 
           <div className="form-row">
-            <button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+            <button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
           </div>
         </form>
       )}

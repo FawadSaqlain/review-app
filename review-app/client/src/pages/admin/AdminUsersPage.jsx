@@ -57,7 +57,11 @@ export default function AdminUsersPage() {
     <div className="card">
       <h1>Student Users</h1>
 
-      <p><Link to="/admin/users/new">Create new student</Link></p>
+      <p>
+        <Link to="/admin/users/new" className="btn btn-primary">
+          Create new student
+        </Link>
+      </p>
 
       <form className="form-inline" onSubmit={handleSearchSubmit}>
         <div className="form-group">

@@ -133,74 +133,78 @@ export default function AdminOfferingEditPage() {
             onChange={(e) => setCourseTitle(e.target.value)}
           />
         </div>
-        <div className="form-row">
-          <label htmlFor="department">Department</label>
-          <select
-            id="department"
-            name="department"
-            value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value)}
-          >
-            <option value="">-- Select Dept --</option>
-            {departments.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+        <div className="form-row form-row-inline">
+          <div className="field">
+            <label htmlFor="department">Department</label>
+            <select
+              id="department"
+              name="department"
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+            >
+              <option value="">-- Select Dept --</option>
+              {departments.map((d) => (
+                <option key={d._id} value={d._id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="program">Program</label>
+            <select
+              id="program"
+              name="program"
+              value={programId}
+              onChange={(e) => setProgramId(e.target.value)}
+            >
+              <option value="">-- Select Program --</option>
+              {programs.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="form-row">
-          <label htmlFor="program">Program</label>
-          <select
-            id="program"
-            name="program"
-            value={programId}
-            onChange={(e) => setProgramId(e.target.value)}
-          >
-            <option value="">-- Select Program --</option>
-            {programs.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="form-row">
-          <label htmlFor="semesterNumber">Semester Number</label>
-          <input
-            id="semesterNumber"
-            name="semesterNumber"
-            type="number"
-            min="1"
-            max="12"
-            value={semesterNumber}
-            onChange={(e) => setSemesterNumber(e.target.value)}
-          />
-        </div>
-        <div className="form-row">
-          <label htmlFor="section">Section</label>
-          <input
-            id="section"
-            name="section"
-            value={section}
-            onChange={(e) => setSection(e.target.value)}
-          />
-        </div>
-        <div className="form-row">
-          <label htmlFor="term">Term</label>
-          <select
-            id="term"
-            name="term"
-            value={termId}
-            onChange={(e) => setTermId(e.target.value)}
-          >
-            <option value="">-- Select Term --</option>
-            {terms.map((t) => (
-              <option key={t._id} value={t._id}>
-                {t.name} {t.isActive ? '(active)' : ''}
-              </option>
-            ))}
-          </select>
+        <div className="form-row form-row-inline">
+          <div className="field">
+            <label htmlFor="semesterNumber">Semester Number</label>
+            <input
+              id="semesterNumber"
+              name="semesterNumber"
+              type="number"
+              min="1"
+              max="12"
+              value={semesterNumber}
+              onChange={(e) => setSemesterNumber(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="section">Section</label>
+            <input
+              id="section"
+              name="section"
+              value={section}
+              onChange={(e) => setSection(e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="term">Term</label>
+            <select
+              id="term"
+              name="term"
+              value={termId}
+              onChange={(e) => setTermId(e.target.value)}
+            >
+              <option value="">-- Select Term --</option>
+              {terms.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name} {t.isActive ? '(active)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="form-row">
           <button type="submit">Save</button>
