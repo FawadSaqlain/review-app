@@ -66,13 +66,29 @@ export default function AdminRatingsPage() {
   return (
     <>
       <div className="card">
-        <h2>Admin • Ratings</h2>
-        <p className="muted">Summary-only view for inactive terms. Active-term ratings are not displayed.</p>
+        <h2>
+          <i
+            className="fa-solid fa-chart-line"
+            style={{ marginRight: 8, color: 'var(--primary)' }}
+          />
+          Admin • Ratings
+        </h2>
+        <p className="muted" style={{ marginBottom: 14 }}>
+          Summary-only view for inactive terms. Active-term ratings are not displayed.
+        </p>
 
-        <form className="filters" onSubmit={(e) => e.preventDefault()}>
-          <div>
-            <label>Search</label>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="course or teacher" />
+        <form className="filters filters-compact" onSubmit={(e) => e.preventDefault()}>
+          <div className="filters-search">
+            <label htmlFor="admin-ratings-search">Search</label>
+            <div className="filters-search-input">
+              <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+              <input
+                id="admin-ratings-search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by course, teacher, or term"
+              />
+            </div>
           </div>
         </form>
 
@@ -85,32 +101,59 @@ export default function AdminRatingsPage() {
 
         <ul style={{ listStyle: 'none', paddingLeft: 0, marginTop: 12 }}>
           {(items || []).map((s) => {
-            const offering = `${teacherLabel(s?.offering?.teacher)} — ${courseLabel(s?.offering?.course)}`.trim();
+            const course = courseLabel(s?.offering?.course);
+            const teacher = teacherLabel(s?.offering?.teacher);
             const termName = s?.term?.name || '';
+            const overall = typeof s.avgOverall === 'number' ? s.avgOverall : null;
+            const rounded = overall != null ? Math.round(overall) : null;
+
+            let badgeClass = 'rating-badge';
+            if (rounded != null) {
+              if (rounded <= 2) badgeClass += ' rating-badge-bad';
+              else if (rounded === 3) badgeClass += ' rating-badge-ok';
+              else if (rounded >= 4) badgeClass += ' rating-badge-good';
+            }
+
             return (
-              <li
-                key={s._id}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid #e5e7eb',
-                  marginBottom: 8,
-                }}
-              >
-                <div style={{ marginBottom: 6 }}>
-                  <strong>{offering}</strong>
-                  {termName ? <span className="muted"> — {termName}</span> : null}
+              <li key={s._id} className="rating-card">
+                <div className="rating-card-header">
+                  <div>
+                    {(course || teacher || termName) && (
+                      <div>
+                        <strong>
+                          {course || 'Course'}
+                          {teacher ? ` — ${teacher}` : ''}
+                        </strong>
+                        {termName ? <span className="muted"> — {termName}</span> : null}
+                      </div>
+                    )}
+
+                    <div className="rating-card-meta">
+                      <span>
+                        <i className="fa-solid fa-users" style={{ marginRight: 4, color: 'var(--primary)' }} />
+                        {typeof s.count === 'number' ? `${s.count} review${s.count === 1 ? '' : 's'}` : 'No reviews'}
+                      </span>
+                      <span>
+                        <i className="fa-solid fa-percent" style={{ marginRight: 4, color: 'var(--primary)' }} />
+                        Avg marks: {' '}
+                        {typeof s.avgMarks === 'number' ? s.avgMarks.toFixed(2) : 'N/A'}
+                      </span>
+                      <span>
+                        <i className="fa-regular fa-calendar" style={{ marginRight: 4 }} />
+                        Updated: {' '}
+                        {new Date(s.updatedAt || s.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className={badgeClass}>
+                      {overall != null ? overall.toFixed(2) : 'N/A'} / 5
+                    </div>
+                  </div>
                 </div>
-                <strong>Summary (stored):</strong>
-                <p>{s.summary}</p>
-                <p>
-                  <strong>Count:</strong> {typeof s.count === 'number' ? s.count : 'N/A'}
-                  &nbsp; <strong>Avg overall:</strong>{' '}
-                  {typeof s.avgOverall === 'number' ? s.avgOverall.toFixed(2) : 'N/A'}
-                  &nbsp; <strong>Avg marks:</strong>{' '}
-                  {typeof s.avgMarks === 'number' ? s.avgMarks.toFixed(2) : 'N/A'}
-                </p>
-                <em>Generated: {new Date(s.updatedAt || s.createdAt).toLocaleString()}</em>
+
+                {s.summary && <p className="rating-card-summary">{s.summary}</p>}
               </li>
             );
           })}
