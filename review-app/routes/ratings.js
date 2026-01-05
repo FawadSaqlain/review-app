@@ -17,8 +17,11 @@ router.put('/:id', loginRequire, ratingController.update);
 
 // view ratings for offering (login required now)
 router.get('/offering/:offering', loginRequire, ratingController.viewForOffering);
-// ratings index (login required)
-router.get('/', loginRequire, ratingController.viewForOffering);
+// Legacy ratings index HTML view was previously mounted at '/'.
+// This route is disabled so that the React SPA '/ratings' page can own that path.
+// If you still need the old server-rendered table view, mount it on a different
+// URL such as '/legacy' instead of the main ratings index.
+// router.get('/', loginRequire, ratingController.viewForOffering);
 
 // render edit form for an existing rating (student owner, within edit window)
 router.get('/:id/edit', loginRequire, ratingController.renderEditForm);

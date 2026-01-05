@@ -123,6 +123,13 @@ pre{background:#020617;padding:12px 14px;border-radius:8px;font-size:0.9rem;over
 form .form-row, form > div{margin-bottom:14px}
 textarea{min-height:120px;resize:vertical}
 
+/* styled file input (e.g. ID card upload) */
+.file-input-wrapper{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.file-input-label{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;border:1px solid rgba(148,163,184,0.6);background:#020617;color:#e5e7eb;font-size:0.9rem;font-weight:500;cursor:pointer;box-shadow:0 6px 18px rgba(15,23,42,0.8);}
+.file-input-label i{color:var(--primary)}
+.file-input{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.file-input-name{font-size:0.85rem;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* inline form rows for small inputs on admin forms */
 .form-row-inline{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
 .form-row-inline .field{flex:1 1 0;min-width:0}

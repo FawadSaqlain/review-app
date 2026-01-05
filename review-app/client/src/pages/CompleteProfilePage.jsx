@@ -32,6 +32,20 @@ export default function CompleteProfilePage() {
     }
   }, [user]);
 
+  const onFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    setMessage('');
+
+    if (file && file.size > 1024 * 1024) {
+      setMessage('ID card image must be at most 1MB.');
+      e.target.value = '';
+      setIdCard(null);
+      return;
+    }
+
+    setIdCard(file);
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -45,7 +59,7 @@ export default function CompleteProfilePage() {
     }
 
     if (!/^\+92\d{10}$/.test(phoneTrimmed)) {
-      setMessage('Phone must be 13 characters starting with +92 followed by 10 digits, e.g., +923001234567.');
+      setMessage('Phone must start with +92 followed by 10 digits, e.g., +923001234567.');
       return;
     }
 
@@ -84,7 +98,7 @@ export default function CompleteProfilePage() {
 
         <div className="form-row">
           <label>Phone</label>
-          <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g., 03xx-xxxxxxx" />
+          <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g., +923001234567" />
         </div>
 
         {showCgpa && (
@@ -96,7 +110,21 @@ export default function CompleteProfilePage() {
 
         <div className="form-row">
           <label>University ID Card (image, max 1MB)</label>
-          <input type="file" accept="image/*" onChange={(e) => setIdCard(e.target.files?.[0] || null)} />
+          <div className="file-input-wrapper">
+            <label className="file-input-label">
+              <i className="fa-regular fa-id-card" aria-hidden="true" />
+              Choose file
+              <input
+                type="file"
+                accept="image/*"
+                className="file-input"
+                onChange={onFileChange}
+              />
+            </label>
+            {idCard && (
+              <span className="file-input-name">{idCard.name}</span>
+            )}
+          </div>
         </div>
 
         <button type="submit" disabled={status === 'loading'}>
