@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchMe, login } from '../features/auth/authSlice.js';
+import { apiRequest } from '../lib/api.js';
 
 export default function LoginPage() {
   const dispatch = useDispatch();
@@ -17,11 +18,8 @@ export default function LoginPage() {
   useEffect(() => {
     if (token) {
       dispatch(fetchMe());
-      const params = new URLSearchParams(location.search);
-      const next = params.get('next');
-      navigate(next ? decodeURIComponent(next) : '/profile', { replace: true });
     }
-  }, [dispatch, token, location.search, navigate]);
+  }, [dispatch, token]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -30,11 +28,33 @@ export default function LoginPage() {
       const action = await dispatch(login({ email, password }));
       if (login.rejected.match(action)) return;
       const user = action.payload?.data?.user;
+
+      // If profile is not complete, always force complete-profile first
       if (user && user.profileComplete === false) {
         navigate('/complete-profile', { replace: true });
+        return;
+      }
+
+      // Profile is complete (or user missing) -> decide based on pending reviews
+      try {
+        const res = await apiRequest('/api/ratings/give-options');
+        const data = res && res.data ? res.data : {};
+        const offerings = data.offerings || [];
+
+        if (offerings.length > 0) {
+          // There are still offerings left to rate
+          navigate('/ratings/give', { replace: true });
+        } else {
+          // All reviews done; send to ratings browse
+          navigate('/ratings', { replace: true });
+        }
+      } catch (err) {
+        // If anything goes wrong, fall back to ratings page
+        navigate('/ratings', { replace: true });
       }
     } catch (e2) {
       // handled by slice
+      console.log("login redirection error ",e2);
     }
   };
 

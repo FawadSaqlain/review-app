@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { apiRequest } from '../lib/api.js';
 
 export default function StudentGiveReviewFormPage() {
   const { offeringId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const offeringFromState = location.state && location.state.offering ? location.state.offering : null;
 
   const [overallRating, setOverallRating] = useState('');
   const [hoverRating, setHoverRating] = useState(0);
@@ -41,9 +44,51 @@ export default function StudentGiveReviewFormPage() {
           comment,
         }),
       });
-      setMessage('Rating submitted.');
-      // After submit, send user to My Reviews
-      navigate('/dashboard/ratings');
+      const courseLabel =
+        offeringFromState && offeringFromState.course && (offeringFromState.course.title || offeringFromState.course.name)
+          ? offeringFromState.course.title || offeringFromState.course.name
+          : null;
+      const teacherLabel =
+        offeringFromState && offeringFromState.teacher && offeringFromState.teacher.name
+          ? [offeringFromState.teacher.name.first, offeringFromState.teacher.name.last].filter(Boolean).join(' ')
+          : null;
+
+      if (courseLabel || teacherLabel) {
+        setMessage(
+          `Rating submitted for ${courseLabel || 'course'}${
+            teacherLabel ? ` — ${teacherLabel}` : ''
+          }.`
+        );
+      } else {
+        setMessage('Rating submitted.');
+      }
+
+      // Clear form inputs after successful submit
+      setOverallRating('');
+      setHoverRating(0);
+      setObtainedMarks('');
+      setComment('');
+
+      // After submit, check if there are more offerings left to rate
+      try {
+        const res = await apiRequest('/api/ratings/give-options');
+        const data = res && res.data ? res.data : {};
+        const offerings = data.offerings || [];
+
+        if (offerings.length > 0) {
+          const next = offerings[0];
+          if (next && next._id) {
+            navigate(`/ratings/give/${next._id}`, { replace: true, state: { offering: next } });
+            return;
+          }
+        }
+
+        // If nothing left (or malformed), send to ratings browse
+        navigate('/ratings', { replace: true });
+      } catch (nextErr) {
+        // On error checking next offerings, just go to ratings page
+        navigate('/ratings', { replace: true });
+      }
     } catch (e) {
       setError(e.message || 'Failed to submit rating');
     } finally {
@@ -60,6 +105,21 @@ export default function StudentGiveReviewFormPage() {
         />
         Give Review
       </h1>
+
+      {offeringFromState && (
+        <p className="muted" style={{ marginTop: 4 }}>
+          {offeringFromState.course && (offeringFromState.course.title || offeringFromState.course.name)
+            ? offeringFromState.course.title || offeringFromState.course.name
+            : 'Course'}{' '}
+          —{' '}
+          {offeringFromState.teacher && offeringFromState.teacher.name
+            ? [offeringFromState.teacher.name.first, offeringFromState.teacher.name.last]
+                .filter(Boolean)
+                .join(' ') || 'Teacher'
+            : 'Teacher'}
+          {offeringFromState.section ? ` (Section ${offeringFromState.section})` : ''}
+        </p>
+      )}
 
       {error && (
         <div className="response" style={{ marginTop: 8 }}>

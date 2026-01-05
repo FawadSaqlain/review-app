@@ -46,8 +46,9 @@ export default function StudentGiveReviewPage() {
     };
   }, [user, dispatch, navigate]);
 
-  const handleGiveReview = (offeringId) => {
-    navigate(`/ratings/give/${offeringId}`);
+  const handleGiveReview = (offering) => {
+    if (!offering || !offering._id) return;
+    navigate(`/ratings/give/${offering._id}`, { state: { offering } });
   };
 
   const activeTermId = activeTerm && activeTerm._id ? String(activeTerm._id) : null;
@@ -116,7 +117,7 @@ export default function StudentGiveReviewPage() {
                     : 'Teacher'}
                   {o.section ? ` (Section ${o.section})` : ''}
                 </div>
-                <button type="button" onClick={() => handleGiveReview(o._id)}>
+                <button type="button" onClick={() => handleGiveReview(o)}>
                   Give Review
                 </button>
               </li>

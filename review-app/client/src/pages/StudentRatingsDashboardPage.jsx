@@ -75,17 +75,6 @@ export default function StudentRatingsDashboardPage() {
         My Ratings
       </h1>
 
-      <form className="filters" style={{ marginTop: 8 }} onSubmit={onApply}>
-        <label>
-          Search
-          <br />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} type="text" placeholder="comment or course/teacher" />
-        </label>
-        <button type="submit" disabled={ratings.status === 'loading'}>
-          {ratings.status === 'loading' ? 'Loading…' : 'Apply'}
-        </button>
-      </form>
-
       {ratings.error && <div className="response">{ratings.error}</div>}
 
       <div id="results">
