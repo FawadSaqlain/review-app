@@ -9,13 +9,66 @@ const path = require('path');
 // Helper: normalize name "First Last"
 function normalizeName(name) {
   if (!name) return null;
-  return name.trim().split(/\s+/).map(s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()).join(' ');
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+    .join(' ');
 }
 
 // Escape string to safely use inside RegExp
 function escapeRegExp(str) {
   if (str === undefined || str === null) return '';
   return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Generate RatingSummary documents for all offerings in a given term.
+// This is called when a term is deactivated (during activation of a new term).
+async function generateSummariesForTerm(termId) {
+  if (!termId) return;
+  const Rating = require('../models').Rating;
+  const RatingSummary = require('../models').RatingSummary;
+  const OfferingModel = require('../models').Offering;
+  const { summarizeComments } = require('../lib/commentSummarizer');
+
+  const offerings = await OfferingModel.find({ term: termId }).select('_id').lean();
+  for (const o of offerings) {
+    try {
+      const ratings = await Rating.find({ offering: o._id }).lean();
+      if (!ratings || ratings.length === 0) continue;
+
+      const comments = ratings.map((r) => r.comment).filter(Boolean);
+      const avgOverall =
+        ratings.reduce((s, r) => s + (r.overallRating || 0), 0) / ratings.length;
+      const avgMarks =
+        ratings.reduce(
+          (s, r) =>
+            s + (typeof r.obtainedMarks !== 'undefined' && r.obtainedMarks !== null
+              ? r.obtainedMarks
+              : 0),
+          0
+        ) / ratings.length;
+
+      const summaryObj = summarizeComments(comments, avgOverall || 0, avgMarks || 0);
+
+      await RatingSummary.findOneAndUpdate(
+        { offering: o._id, term: termId },
+        {
+          summary: summaryObj.summary,
+          avgOverall: summaryObj.avgOverall,
+          avgMarks: summaryObj.avgMarks,
+          count: summaryObj.count,
+        },
+        { upsert: true, new: true }
+      );
+    } catch (inner) {
+      console.warn(
+        'Could not generate summary for offering',
+        o._id,
+        inner && inner.message
+      );
+    }
+  }
 }
 
 // PDF timetable parsing removed. Bulk timetable uploads are expected to be
@@ -36,34 +89,10 @@ exports.uploadTimetable = async (req, res) => {
   } catch (err) {
     console.error('uploadTimetable error', err && err.stack ? err.stack : err);
     const isProd = process.env.NODE_ENV === 'production';
-    const payload = { code: 'ERR_INTERNAL', message: isProd ? 'Server error' : (err && err.message) || 'Server error' };
-
-async function generateSummariesForTerm(termId) {
-  if (!termId) return;
-  const Rating = require('../models').Rating;
-  const RatingSummary = require('../models').RatingSummary;
-  const Offering = require('../models').Offering;
-  const { summarizeComments } = require('../lib/commentSummarizer');
-
-  const offerings = await Offering.find({ term: termId }).select('_id').lean();
-  for (const o of offerings) {
-    try {
-      const ratings = await Rating.find({ offering: o._id }).lean();
-      if (!ratings || ratings.length === 0) continue;
-      const comments = ratings.map((r) => r.comment).filter(Boolean);
-      const avgOverall = ratings.reduce((s, r) => s + (r.overallRating || 0), 0) / ratings.length;
-      const avgMarks = ratings.reduce((s, r) => s + (typeof r.obtainedMarks !== 'undefined' && r.obtainedMarks !== null ? r.obtainedMarks : 0), 0) / ratings.length;
-      const summaryObj = summarizeComments(comments, avgOverall || 0, avgMarks || 0);
-      await RatingSummary.findOneAndUpdate(
-        { offering: o._id, term: termId },
-        { summary: summaryObj.summary, avgOverall: summaryObj.avgOverall, avgMarks: summaryObj.avgMarks, count: summaryObj.count },
-        { upsert: true, new: true }
-      );
-    } catch (inner) {
-      console.warn('Could not generate summary for offering', o._id, inner && inner.message);
-    }
-  }
-}
+    const payload = {
+      code: 'ERR_INTERNAL',
+      message: isProd ? 'Server error' : (err && err.message) || 'Server error',
+    };
     if (!isProd && err && err.stack) payload.stack = err.stack;
     return res.status(500).json({ success: false, error: payload });
   }

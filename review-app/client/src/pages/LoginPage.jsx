@@ -24,6 +24,20 @@ export default function LoginPage() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
+
+    // Strict frontend validation
+    const emailPattern = /^(?:fa|sp)\d{2}-(?:baf|bag|bba|bcs|bec|bed|ben|bes|bmd|bse|bsm|bty)-\d{3}@cuivehari\.edu\.pk$/i;
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,16}$/;
+
+    if (!emailPattern.test(email.trim())) {
+      setMessage('Email must be a valid CUI Vehari address like fa22-bse-031@cuivehari.edu.pk.');
+      return;
+    }
+
+    if (!passwordPattern.test(password)) {
+      setMessage('Password must be 8-16 characters and include uppercase, lowercase, number, and special character.');
+      return;
+    }
     try {
       const action = await dispatch(login({ email, password }));
       if (login.rejected.match(action)) return;

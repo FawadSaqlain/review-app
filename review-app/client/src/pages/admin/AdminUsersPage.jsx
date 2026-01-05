@@ -27,9 +27,12 @@ export default function AdminUsersPage() {
       params.set('page', String(nextPage));
       const res = await apiRequest(`/api/admin/users?${params.toString()}`);
       const data = res && res.data ? res.data : {};
-      setUsers(data.users || []);
+      const allUsers = data.users || [];
+      // Only manage student accounts in this UI; filter out admins
+      const studentUsers = allUsers.filter((u) => u.role !== 'admin');
+      setUsers(studentUsers);
       setPage(data.page || nextPage);
-      setTotal(data.total || 0);
+      setTotal(studentUsers.length || 0);
     } catch (err) {
       setError(err.message || 'Failed to load users');
     } finally {
@@ -52,9 +55,9 @@ export default function AdminUsersPage() {
 
   return (
     <div className="card">
-      <h1>Admin Users</h1>
+      <h1>Student Users</h1>
 
-      <p><Link to="/admin/users/new">Create new user</Link></p>
+      <p><Link to="/admin/users/new">Create new student</Link></p>
 
       <form className="form-inline" onSubmit={handleSearchSubmit}>
         <div className="form-group">

@@ -17,6 +17,11 @@ export default function ResetPasswordPage() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,16}$/;
+    if (!passwordPattern.test(newPassword)) {
+      setMessage('Password must be 8-16 characters and include uppercase, lowercase, number, and special character.');
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setMessage('Passwords do not match.');
       return;

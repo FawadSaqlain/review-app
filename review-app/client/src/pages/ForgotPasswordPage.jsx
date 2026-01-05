@@ -15,6 +15,11 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
+    const emailPattern = /^(?:fa|sp)\d{2}-(?:baf|bag|bba|bcs|bec|bed|ben|bes|bmd|bse|bsm|bty)-\d{3}@cuivehari\.edu\.pk$/i;
+    if (!emailPattern.test(email.trim())) {
+      setMessage('Email must be a valid CUI Vehari address like fa22-bse-031@cuivehari.edu.pk.');
+      return;
+    }
     const action = await dispatch(forgotPassword({ email }));
     if (forgotPassword.fulfilled.match(action)) {
       const msg = action.payload?.data?.message || 'If the email exists, a reset code will be sent to your email.';

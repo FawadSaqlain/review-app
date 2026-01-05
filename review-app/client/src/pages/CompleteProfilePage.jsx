@@ -36,9 +36,30 @@ export default function CompleteProfilePage() {
     e.preventDefault();
     setMessage('');
 
+    const sectionTrimmed = section.trim();
+    const phoneTrimmed = phone.trim();
+
+    if (!sectionTrimmed || !/^[A-Za-z]$/.test(sectionTrimmed)) {
+      setMessage('Section must be a single alphabet letter (e.g., A, B, C).');
+      return;
+    }
+
+    if (!/^\+92\d{10}$/.test(phoneTrimmed)) {
+      setMessage('Phone must be 13 characters starting with +92 followed by 10 digits, e.g., +923001234567.');
+      return;
+    }
+
+    if (showCgpa && cgpa) {
+      const g = Number(cgpa);
+      if (Number.isNaN(g) || g < 0 || g > 4) {
+        setMessage('CGPA must be a number between 0 and 4.');
+        return;
+      }
+    }
+
     const fd = new FormData();
-    fd.append('section', section);
-    fd.append('phone', phone);
+    fd.append('section', sectionTrimmed);
+    fd.append('phone', phoneTrimmed);
     if (showCgpa && cgpa) fd.append('cgpa', cgpa);
     if (idCard) fd.append('idCard', idCard); // backend expects `idCard`
 

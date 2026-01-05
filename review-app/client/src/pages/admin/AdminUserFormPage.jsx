@@ -76,9 +76,84 @@ export default function AdminUserFormPage() {
     setSaving(true);
     setError(null);
     try {
+      const emailPattern = /^(?:fa|sp)\d{2}-(?:baf|bag|bba|bcs|bec|bed|ben|bes|bmd|bse|bsm|bty)-\d{3}@cuivehari\.edu\.pk$/i;
+      const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,16}$/;
+
+      const emailTrimmed = form.email.trim();
+      if (!emailPattern.test(emailTrimmed)) {
+        setError('Email must be a valid CUI Vehari student address like fa22-bse-031@cuivehari.edu.pk.');
+        setSaving(false);
+        return;
+      }
+
+      if (!form.degreeShort || !/^(?:baf|bag|bba|bcs|bec|bed|ben|bes|bmd|bse|bsm|bty)$/i.test(form.degreeShort.trim())) {
+        setError('Degree short must be one of: baf, bag, bba, bcs, bec, bed, ben, bes, bmd, bse, bsm, bty.');
+        setSaving(false);
+        return;
+      }
+
+      if (!/^[0-9]{3}$/.test(String(form.rollNumber).trim())) {
+        setError('Roll number must be a 3-digit number, e.g. 031.');
+        setSaving(false);
+        return;
+      }
+
+      if (form.intake) {
+        if (!/^(?:fa|sp)\d{2}$/i.test(form.intake.trim())) {
+          setError('Intake must be like fa22 or sp22 (optional).');
+          setSaving(false);
+          return;
+        }
+      }
+
+      if (form.semesterNumber) {
+        const sem = Number(form.semesterNumber);
+        if (Number.isNaN(sem) || sem < 1 || sem > 12) {
+          setError('Semester number must be between 1 and 12.');
+          setSaving(false);
+          return;
+        }
+      }
+
+      if (form.section) {
+        if (!/^[A-Za-z]$/.test(form.section.trim())) {
+          setError('Section must be a single alphabet letter (e.g., A, B, C).');
+          setSaving(false);
+          return;
+        }
+      }
+
+      if (form.cgpa !== '' && form.cgpa !== null && typeof form.cgpa !== 'undefined') {
+        const g = Number(form.cgpa);
+        if (Number.isNaN(g) || g < 0 || g > 4) {
+          setError('CGPA must be a number between 0 and 4.');
+          setSaving(false);
+          return;
+        }
+      }
+
+      if (form.phone) {
+        const phoneTrimmed = form.phone.trim();
+        if (!/^\+92\d{10}$/.test(phoneTrimmed)) {
+          setError('Phone must be 13 characters starting with +92 followed by 10 digits, e.g., +923001234567.');
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Password is optional on edit; if provided, enforce strength
+      if (form.password && !passwordPattern.test(form.password)) {
+        setError('Password must be 8-16 characters and include uppercase, lowercase, number, and special character.');
+        setSaving(false);
+        return;
+      }
+
       const body = { ...form };
+      body.email = emailTrimmed;
       // backend expects isActive present or absent; we send boolean
       body.isActive = form.isActive;
+      // Only student users are managed via this UI
+      body.role = 'student';
 
       if (isEdit) {
         await apiRequest(`/api/admin/users/${id}`, {
@@ -158,14 +233,6 @@ export default function AdminUserFormPage() {
           <div className="form-row">
             <label>Phone</label>
             <input name="phone" value={form.phone} onChange={handleChange} />
-          </div>
-
-          <div className="form-row">
-            <label>Role</label>
-            <select name="role" value={form.role} onChange={handleChange}>
-              <option value="student">Student</option>
-              <option value="admin">Admin</option>
-            </select>
           </div>
 
           <div className="form-row">
