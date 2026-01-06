@@ -4,15 +4,6 @@ const { Rating, User } = require('../models');
 // query: minMarks, minStars, search, sort (createdAt|overallRating|obtainedMarks), order (asc|desc), page, limit
 exports.list = async (req, res) => {
   try {
-    // loginRequire middleware now protects this route and attaches req.user.
-    // Block students with incomplete profiles from viewing ratings.
-    if (req.user && (!req.user.role || req.user.role === 'student') && !req.user.profileComplete) {
-      return res.status(403).json({
-        success: false,
-        error: { message: 'Please complete your profile before viewing your reviews.' }
-      });
-    }
-
     const q = {};
 
     const { minMarks, minStars, search, sort='createdAt', order='desc', page=1, limit=25, student } = req.query;
