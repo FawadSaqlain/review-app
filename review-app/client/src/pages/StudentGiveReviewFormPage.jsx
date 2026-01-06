@@ -34,7 +34,8 @@ export default function StudentGiveReviewFormPage() {
 
     try {
       setLoading(true);
-      await apiRequest('/ratings', {
+      // Submit via JSON API so the SPA talks to the Express /api/ratings router
+      await apiRequest('/api/ratings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
