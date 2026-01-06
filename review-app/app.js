@@ -6,17 +6,26 @@ var logger = require('morgan');
 const fileUpload = require('express-fileupload');
 const fs = require('fs');
 
-// load environment
-require('dotenv').config();
+// load environment (ensure .env overrides any existing env vars)
+require('dotenv').config({ override: true });
 
-// Log whether GenAI/Gemini key is present (do not print the key itself)
-const hasGenAIKey = !!(process.env.GENAI_API_KEY || process.env.GEMINI_API_KEY);
-console.log('GenAI key present:', hasGenAIKey);
+// // Log whether GenAI/Gemini key is present (do not print the key itself)
+// const hasGenAIKey = !!(process.env.GENAI_API_KEY || process.env.GEMINI_API_KEY);
+// console.log('GenAI key present:', hasGenAIKey);
 
 // connect to MongoDB
 const mongoose = require('mongoose');
 mongoose.set('strictQuery', false);
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/review-app';
+const MONGO_URI = process.env.MONGO_URI;
+
+// Log which Mongo URI host is being used (mask password)
+if (!MONGO_URI) {
+  console.error('MONGO_URI is not defined. Check your .env file.');
+} else {
+  const safeMongoUri = MONGO_URI.replace(/:\\S+@/, '://***@');
+  console.log('Using Mongo URI:', safeMongoUri);
+}
+
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => {

@@ -11,7 +11,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const path = require('path');
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/review-app';
+const MONGO_URI = process.env.MONGO_URI;
 
 async function main() {
   const email = process.env.ADMIN_EMAIL || process.argv[2];
