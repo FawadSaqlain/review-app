@@ -1,5 +1,5 @@
 const { User, Audit } = require('../models');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 // List users (paginated basic - HTML view)
 exports.list = async (req, res) => {
@@ -294,3 +294,4 @@ exports.delete = async (req, res) => {
     return res.status(500).send('Server error');
   }
 };
+
