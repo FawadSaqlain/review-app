@@ -8,7 +8,7 @@
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const path = require('path');
 
 const MONGO_URI = process.env.MONGO_URI;
@@ -62,3 +62,4 @@ main().catch(err => {
   console.error('seed-admin error', err);
   process.exit(2);
 });
+
