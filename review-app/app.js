@@ -85,6 +85,11 @@ app.use('/admin/ratings', adminRatingsRouter);
 app.use('/dashboard', dashboardRouter);
 app.use('/', viewsRouter);
 
+// simple health route for Vercel sanity check
+app.get('/health', function(req, res) {
+  res.type('text').send('CVUR backend is running');
+});
+
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
   next(createError(404));
