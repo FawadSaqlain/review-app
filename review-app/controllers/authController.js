@@ -1,4 +1,4 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { User, VerificationToken } = require('../models');
@@ -615,3 +615,4 @@ exports.resetPassword = async (req, res) => {
     return res.status(500).json({ success: false, error: { code: 'ERR_INTERNAL', message: 'Server error' } });
   }
 };
+
